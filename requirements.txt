@@ -1,0 +1,8 @@
+gunicorn
+gevent
+flask
+tinydb
+requests
+bilix
+shazamio
+python-dotenv
