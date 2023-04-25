@@ -10,7 +10,7 @@ import html
 import re
 from datetime import datetime
 from tinydb import TinyDB, Query, where
-from bilix import DownloaderBilibili
+from bilix.sites.bilibili import DownloaderBilibili
 # from util import download_video
 from flask import Flask, flash, request, render_template
 

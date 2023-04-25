@@ -9,7 +9,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from tinydb import TinyDB, Query, where
 from tinydb.operations import increment
-from bilix import DownloaderBilibili
+from bilix.sites.bilibili import DownloaderBilibili
 from shazamio import Shazam, Serialize
 
 # 加载.env的环境变量

@@ -1,8 +1,8 @@
-gunicorn
-gevent
-flask
-tinydb
-requests
-bilix
-shazamio
-python-dotenv
+gunicorn==20.1.0
+gevent==22.10.2
+flask==2.2.3
+tinydb==4.7.1
+requests==2.28.2
+bilix==0.18.0
+shazamio==0.3.1.1
+python-dotenv==1.0.0
