@@ -17,8 +17,7 @@ load_dotenv()
 # 配置logger
 logger = logging.getLogger()
 
-DB_PATH = '/app/db.json'
-# DB_PATH = './db.json'
+DB_PATH = os.environ['DB_PATH']
 CONCURRENT_TASK_NUM = int(os.environ['CONCURRENT_TASK_NUM'])
 
 db = TinyDB(DB_PATH)

@@ -10,8 +10,8 @@ from util import get_config, set_config, switch_dl_status, find_and_remove
 from tinydb import TinyDB, Query, where
 from flask import Flask, flash, request
 
-DB_PATH = '/app/db.json'
-# DB_PATH = './db.json'
+DEBUG = os.environ.get('DEBUG')
+DB_PATH = os.environ['DB_PATH']
 
 app = Flask(__name__)
 
@@ -36,8 +36,16 @@ def init_cpdate(datestring):
 # 动态列表
 @app.route('/api/list')
 def dynamic_list_api():
-    cpdate = get_config('check_point')
-    sorted_list = sorted(dynamic_list.all(), key=lambda i: i['pdate'], reverse=True)
+    page = int(request.args.get('page') or 1)
+    size = int(request.args.get('size') or 50)
+    # 0全部，1下载失败
+    dtype = int(request.args.get('dtype') or 0)
+    q = where('dstatus') == -1 if dtype == 1 else where('bvid').exists()
+    all_list = sorted(dynamic_list.search(q), key=lambda i: i['pdate'], reverse=True)
+    total = len(all_list)
+    st = (page - 1) * size
+    ed = page * size
+    current_list = all_list[st:ed]
     def add_shazam(item):
         q = where('id') == item['shazam_id']
         target = shazam_list.get(q)
@@ -45,7 +53,22 @@ def dynamic_list_api():
             return {**item, 'etitle': target['title']}
         else:
             return item
-    return {'code': 0, 'list': list(map(add_shazam, sorted_list)), 'total': len(sorted_list), 'timestamp': cpdate}
+    return {'code': 0, 'data': list(map(add_shazam, current_list)), 'total': total }
+
+# 占用空间情况
+@app.route('/api/folder.size')
+def folder_size():
+    def get_dir_size(path='/media'):
+        total = 0
+        with os.scandir(path) as it:
+            for entry in it:
+                if entry.is_file():
+                    total += entry.stat().st_size
+                elif entry.is_dir():
+                    total += get_dir_size(entry.path)
+        return round(total / (1024 ** 3), 2)
+    
+    return {'code': 0, 'data': f'{get_dir_size()}GB'}
 
 # 重试下载视频
 @app.route('/api/retry/<bvids>')
@@ -92,4 +115,4 @@ def delete_from(pd, ts):
     return {'code': 0, 'data': f'共删除 {len(del_list)} 条动态及视频'}
 
 if __name__ == '__main__':
-    app.run()
+    app.run(debug=DEBUG)

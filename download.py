@@ -18,8 +18,7 @@ load_dotenv()
 # 配置logger
 logger = logging.getLogger()
 
-DB_PATH = '/app/db.json'
-# DB_PATH = './db.json'
+DB_PATH = os.environ['DB_PATH']
 USER_DYNAMIC_API = lambda page,offset: f'https://api.bilibili.com/x/polymer/web-dynamic/v1/feed/all?timezone_offset=-480&type=video&page={page}&features=itemOpusStyle&offset={offset}'
 USER_FOLLOW_API = lambda page: f'https://api.bilibili.com/x/relation/tag?mid=543741&tagid=37444368&pn={page}&ps=20'
 VIDEO_DETAIL_API = lambda bvid: f'https://www.bilibili.com/video/{bvid}'
@@ -44,14 +43,19 @@ def fetch_follow(page):
 
 def fetch_detail(bvid):
     res = requests.get(VIDEO_DETAIL_API(bvid))
-    if res.status_code != 200:
+    try:
+        play_info = re.search(r'<script>window.__playinfo__=([^<]+)</script>', res.text)
+        pinfo = json.loads(play_info.group(1))
+        # "accept_description":["超清 4K","高清 1080P+","高清 1080P","高清 720P","清晰 480P","流畅 360P"]
+        max_quality = pinfo['data']['accept_description'][0]
+        vwidth = pinfo['data']['dash']['video'][0]['width']
+        vheight = pinfo['data']['dash']['video'][0]['height']
+        is_portrait = 1 if (vwidth / vheight < 1) else 0
+    except:
         logger.info(f'获取 {bvid} 视频详情失败')
-        return
-
-    # "accept_description":["超清 4K","高清 1080P+","高清 1080P","高清 720P","清晰 480P","流畅 360P"]
-    quality = re.search(r'"accept_description":\["([^"]+)"', res.text)
-    max_quality = quality.group(1)
-    return max_quality
+        return {}
+    else:
+        return {'max_quality': max_quality, 'is_portrait': is_portrait}
 
 def fetch_dynamic(page, offset): 
     cookie = {'SESSDATA': DYNAMIC_COOKIE}
@@ -86,6 +90,7 @@ def fetch_dynamic(page, offset):
             'pdstr': pdstr,
             'shazam_id': 0,
             'dstatus': 0,
+            'dl_retry': 0,
             'ustatus': 0,
         }
 
@@ -148,8 +153,8 @@ def update_dynamic(cpdate, uid_list):
 
     filter_list = list(filter(lambda i: i['uid'] in uid_list, flist))
 
-    add_quality = lambda item: {**item, 'max_quality': fetch_detail(item['bvid'])}
-    d = [add_quality(v) for v in filter_list]
+    add_vinfo = lambda item: {**item, **fetch_detail(item['bvid'])}
+    d = [add_vinfo(v) for v in filter_list]
     
     # 没有更新直接退出
     if len(d) == 0:
@@ -170,7 +175,12 @@ def update_dynamic(cpdate, uid_list):
 
 # async task
 async def async_task():
-    dy_list = dynamic_list.search(where('dstatus') == 0)
+    # 未下载 && 时长小于10分钟
+    def is_vaild(duration):
+        d_arr = duration.split(':')
+        return len(d_arr) < 3 and int(d_arr[0]) < 10
+    q = (where('dstatus') == 0 | (where('dstatus') == -1 & where('dl_retry') < 3)) & where('duration').test(is_vaild)
+    dy_list = dynamic_list.search(q)
     wait_dl_list = sorted(dy_list, key=lambda i: i['pdate'], reverse=True)[:CONCURRENT_TASK_NUM]
     await download_video_list(wait_dl_list, logger.warning)
 

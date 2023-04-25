@@ -8,15 +8,15 @@ import re
 from datetime import datetime
 from dotenv import load_dotenv
 from tinydb import TinyDB, Query, where
+from tinydb.operations import increment
 from bilix import DownloaderBilibili
 from shazamio import Shazam, Serialize
 
 # 加载.env的环境变量
 load_dotenv()
 
-DB_PATH = '/app/db.json'
-# DB_PATH = './db.json'
 DOWNLOAD_COOKIE = os.environ['DL_COOKIE']
+DB_PATH = os.environ['DB_PATH']
 
 MEDIA_FILE_PATH = lambda name: glob.glob(os.path.join('/media', f'{legal_title(name[:30])}*'))
 ATTACHMENT_FILE_PATH = lambda name: glob.glob(os.path.join('/media/extra', f'{legal_title(name[:30])}*'))
@@ -64,6 +64,7 @@ async def download_video_list(li, err_cb):
         item_bvid = li[idx]['bvid']
         if isinstance(item, Exception):
             switch_dl_status(item_bvid, -1)
+            dynamic_list.update(increment('dl_retry'), where('bvid') == item_bvid)
         else:
             switch_dl_status(item_bvid, 200)
     await d.aclose()
