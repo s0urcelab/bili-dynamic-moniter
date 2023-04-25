@@ -78,6 +78,7 @@ def retry_dl_video(bvids):
         if target != None:
             find_and_remove(target['title'])
             switch_dl_status(bvid, 0)
+            dynamic_list.update({'dl_retry': 0}, where('bvid') == bvid)
     return {'code': 0, 'data': f'重新加入下载列表'}
 
 # 修改推测bgm标题
