@@ -10,7 +10,8 @@ import html
 import re
 from datetime import datetime
 from tinydb import TinyDB, Query, where
-# from bilix.sites.bilibili import DownloaderBilibili
+from bilix.sites.bilibili import DownloaderBilibili
+from pathlib import Path
 # from util import download_video
 from flask import Flask, flash, request, render_template
 
@@ -108,3 +109,10 @@ dynamic_list2 = db2.table('dynamic_list')
 # q = ((where('dstatus') == 0) | ((where('dstatus') == -1) & (where('dl_retry') < 3))) & (where('duration') > 600000)
 # dy_list = dynamic_list.search(q)
 # print(dy_list)
+
+# async def async_task():
+#     d = DownloaderBilibili(sess_data='71dab752%2C1696566753%2C24faa%2A41', video_concurrency=1, part_concurrency=1)
+#     await d.get_video(url='https://www.bilibili.com/video/BV1ao4y1L74F', path=Path(''), image=True)
+#     await d.aclose()
+
+# asyncio.get_event_loop().run_until_complete(async_task())

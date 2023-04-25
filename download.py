@@ -11,7 +11,6 @@ from datetime import datetime
 from dotenv import load_dotenv
 from util import set_config, get_config, download_video_list
 from tinydb import TinyDB, Query, where
-from bilix.sites.bilibili import DownloaderBilibili
 
 # 加载.env的环境变量
 load_dotenv()
