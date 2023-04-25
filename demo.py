@@ -10,9 +10,7 @@ import html
 import re
 from datetime import datetime
 from tinydb import TinyDB, Query, where
-from bilix.sites.bilibili import DownloaderBilibili
-from pathlib import Path
-# from util import download_video
+from bilix import DownloaderBilibili
 from flask import Flask, flash, request, render_template
 
 DB_PATH = './db.json'

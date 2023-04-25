@@ -10,7 +10,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from tinydb import TinyDB, Query, where
 from tinydb.operations import increment
-from bilix.sites.bilibili import DownloaderBilibili
+from bilix import DownloaderBilibili
 from shazamio import Shazam, Serialize
 
 # 加载.env的环境变量
@@ -54,11 +54,11 @@ def switch_dl_status(bvid, status):
 async def task(d, bvid):
     # 下载中 100
     switch_dl_status(bvid, 100)
-    await d.get_video(path=Path('/media'), url=f'https://www.bilibili.com/video/{bvid}', image=True)
+    await d.get_video(f'https://www.bilibili.com/video/{bvid}', image=True)
      
 # 下载视频列表
 async def download_video_list(li, err_cb):
-    d = DownloaderBilibili(sess_data=DOWNLOAD_COOKIE, video_concurrency=1, part_concurrency=1)
+    d = DownloaderBilibili(videos_dir='/media', sess_data=DOWNLOAD_COOKIE, video_concurrency=1, part_concurrency=1)
     coros = [task(d, i['bvid']) for i in li]
     ret_list = await asyncio.gather(*coros, return_exceptions=True)
     for idx, item in enumerate(ret_list):

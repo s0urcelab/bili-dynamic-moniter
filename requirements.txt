@@ -3,6 +3,6 @@ gevent==22.10.2
 flask==2.2.3
 tinydb==4.7.1
 requests==2.28.2
-bilix==0.18.0
+bilix==0.14.1
 shazamio==0.3.1.1
 python-dotenv==1.0.0
