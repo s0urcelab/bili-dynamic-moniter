@@ -102,9 +102,8 @@ dynamic_list2 = db2.table('dynamic_list')
 #     else:
 #         return {'duration': duration}
 
-# # for item in dynamic_list.all():
-# #     att = fetch_detail(item)
-# #     dynamic_list.update(att, where('bvid') == item['bvid'])
+# for item in dynamic_list.search(where('dstatus') == 100):
+#     dynamic_list.update({'dstatus': 0}, where('bvid') == item['bvid'])
 
 # q = ((where('dstatus') == 0) | ((where('dstatus') == -1) & (where('dl_retry') < 3))) & (where('duration') > 600000)
 # dy_list = dynamic_list.search(q)
@@ -116,3 +115,5 @@ dynamic_list2 = db2.table('dynamic_list')
 #     await d.aclose()
 
 # asyncio.get_event_loop().run_until_complete(async_task())
+
+# print(dynamic_list.search(where('dstatus') == 100) or 1111)

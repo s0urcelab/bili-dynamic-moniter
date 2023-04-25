@@ -184,14 +184,19 @@ def update_dynamic(cpdate, uid_list):
 
 # async task
 async def async_task():
-    # 未下载 || 可重试 && 时长小于10分钟
+    # 时长小于10分钟
     q_limit = where('duration') < 600000
-    q1 = (where('dstatus') == 0) & q_limit
-    q2 = ((where('dstatus') == -1) & (where('dl_retry') < 3)) & q_limit
-    wait_list = dynamic_list.search(q1)
-    retry_list = dynamic_list.search(q2)
+    # 下载中
+    q1 = (where('dstatus') == 100) & q_limit
+    # 未下载
+    q2 = (where('dstatus') == 0) & q_limit
+    # 可重试
+    q3 = ((where('dstatus') == -1) & (where('dl_retry') < 3)) & q_limit
+    ing_list = dynamic_list.search(q1)
+    wait_list = dynamic_list.search(q2)
+    retry_list = dynamic_list.search(q3)
 
-    dl_list = sorted(wait_list if len(wait_list) > 0 else retry_list, key=lambda i: i['pdate'], reverse=True)[:CONCURRENT_TASK_NUM]
+    dl_list = sorted(ing_list or wait_list or retry_list, key=lambda i: i['pdate'], reverse=True)[:CONCURRENT_TASK_NUM]
     await download_video_list(dl_list, logger.warning)
 
 if __name__ == '__main__':
