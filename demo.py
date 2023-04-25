@@ -10,7 +10,7 @@ import html
 import re
 from datetime import datetime
 from tinydb import TinyDB, Query, where
-from bilix.sites.bilibili import DownloaderBilibili
+# from bilix.sites.bilibili import DownloaderBilibili
 # from util import download_video
 from flask import Flask, flash, request, render_template
 
@@ -79,5 +79,32 @@ dynamic_list2 = db2.table('dynamic_list')
 
 # if __name__ == '__main__':
 #     app.run()
+# VIDEO_DETAIL_API = lambda bvid: f'https://www.bilibili.com/video/{bvid}'
+# def fetch_detail(item):
+#     bvid = item['bvid']
+#     duration_text = item['duration_text']
+#     res = requests.get(VIDEO_DETAIL_API(bvid))
+#     try:
+#         play_info = re.search(r'<script>window.__playinfo__=([^<]+)</script>', res.text)
+#         pinfo = json.loads(play_info.group(1))
+#         duration = pinfo['data']['timelength']
+#     except:
+#         print(f'获取 {bvid} 视频详情失败')
+        
+#         # 字符串反算视频时长
+#         d_arr = duration_text.split(':')
+#         if len(d_arr) == 2:
+#             duration = (int(d_arr[0]) * 60 + int(d_arr[1])) * 1000
+#         if len(d_arr) == 3:
+#             duration = (int(d_arr[0]) * 3600 + int(d_arr[1]) * 60 + int(d_arr[2])) * 1000
+#         return {'duration': duration}
+#     else:
+#         return {'duration': duration}
 
-# dynamic_list.update({'shazam_id': 0}, where('bvid').exists())
+# # for item in dynamic_list.all():
+# #     att = fetch_detail(item)
+# #     dynamic_list.update(att, where('bvid') == item['bvid'])
+
+# q = ((where('dstatus') == 0) | ((where('dstatus') == -1) & (where('dl_retry') < 3))) & (where('duration') > 600000)
+# dy_list = dynamic_list.search(q)
+# print(dy_list)

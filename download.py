@@ -41,7 +41,9 @@ def fetch_follow(page):
         sys.exit() 
     return res_json['data']
 
-def fetch_detail(bvid):
+def fetch_detail(item):
+    bvid = item['bvid']
+    duration_text = item['duration_text']
     res = requests.get(VIDEO_DETAIL_API(bvid))
     try:
         play_info = re.search(r'<script>window.__playinfo__=([^<]+)</script>', res.text)
@@ -51,11 +53,19 @@ def fetch_detail(bvid):
         vwidth = pinfo['data']['dash']['video'][0]['width']
         vheight = pinfo['data']['dash']['video'][0]['height']
         is_portrait = 1 if (vwidth / vheight < 1) else 0
+        duration = pinfo['data']['timelength']
     except:
         logger.info(f'获取 {bvid} 视频详情失败')
-        return {}
+        
+        # 字符串反算视频时长
+        d_arr = duration_text.split(':')
+        if len(d_arr) == 2:
+            duration = (int(d_arr[0]) * 60 + int(d_arr[1])) * 1000
+        if len(d_arr) == 3:
+            duration = (int(d_arr[0]) * 3600 + int(d_arr[1]) * 60 + int(d_arr[2])) * 1000
+        return {'duration': duration}
     else:
-        return {'max_quality': max_quality, 'is_portrait': is_portrait}
+        return {'max_quality': max_quality, 'is_portrait': is_portrait, 'duration': duration}
 
 def fetch_dynamic(page, offset): 
     cookie = {'SESSDATA': DYNAMIC_COOKIE}
@@ -76,7 +86,7 @@ def fetch_dynamic(page, offset):
         bvid = item['modules']['module_dynamic']['major']['archive']['bvid']
         cover = item['modules']['module_dynamic']['major']['archive']['cover']
         desc = item['modules']['module_dynamic']['major']['archive']['desc']
-        duration = item['modules']['module_dynamic']['major']['archive']['duration_text']
+        duration_text = item['modules']['module_dynamic']['major']['archive']['duration_text']
         return {
             'uid': uid,
             'uname': uname,
@@ -84,7 +94,7 @@ def fetch_dynamic(page, offset):
             'bvid': bvid,
             'cover': cover,
             'desc': desc,
-            'duration': duration,
+            'duration_text': duration_text,
             'avatar': avatar, 
             'pdate': pdate, 
             'pdstr': pdstr,
@@ -153,7 +163,7 @@ def update_dynamic(cpdate, uid_list):
 
     filter_list = list(filter(lambda i: i['uid'] in uid_list, flist))
 
-    add_vinfo = lambda item: {**item, **fetch_detail(item['bvid'])}
+    add_vinfo = lambda item: {**item, **fetch_detail(item)}
     d = [add_vinfo(v) for v in filter_list]
     
     # 没有更新直接退出
@@ -175,11 +185,8 @@ def update_dynamic(cpdate, uid_list):
 
 # async task
 async def async_task():
-    # 未下载 && 时长小于10分钟
-    def is_vaild(duration):
-        d_arr = duration.split(':')
-        return len(d_arr) < 3 and int(d_arr[0]) < 10
-    q = (where('dstatus') == 0 | (where('dstatus') == -1 & where('dl_retry') < 3)) & where('duration').test(is_vaild)
+    # 未下载 || 可重试 && 时长小于10分钟
+    q = ((where('dstatus') == 0) | ((where('dstatus') == -1) & (where('dl_retry') < 3))) & (where('duration') < 600000)
     dy_list = dynamic_list.search(q)
     wait_dl_list = sorted(dy_list, key=lambda i: i['pdate'], reverse=True)[:CONCURRENT_TASK_NUM]
     await download_video_list(wait_dl_list, logger.warning)
