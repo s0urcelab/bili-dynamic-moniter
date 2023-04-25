@@ -17,8 +17,8 @@ app = Flask(__name__)
 
 db = TinyDB(DB_PATH)
 config = db.table('config')
-shazam_list = db.table('shazam_list')
-dynamic_list = db.table('dynamic_list')
+shazam_list = db.table('shazam_list', cache_size=0)
+dynamic_list = db.table('dynamic_list', cache_size=0)
 
 # 托管静态资源
 @app.route('/', defaults={'path': ''})

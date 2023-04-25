@@ -28,7 +28,7 @@ CONCURRENT_TASK_NUM = int(os.environ['CONCURRENT_TASK_NUM'])
 
 db = TinyDB(DB_PATH)
 config = db.table('config')
-dynamic_list = db.table('dynamic_list')
+dynamic_list = db.table('dynamic_list', cache_size=0)
 
 def fetch_follow(page): 
     cookie = {'SESSDATA': DYNAMIC_COOKIE}

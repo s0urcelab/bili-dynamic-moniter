@@ -24,8 +24,8 @@ ATTACHMENT_FILE_PATH = lambda name: glob.glob(os.path.join('/media/extra', f'{le
 
 db = TinyDB(DB_PATH)
 config = db.table('config')
-shazam_list = db.table('shazam_list')
-dynamic_list = db.table('dynamic_list')
+shazam_list = db.table('shazam_list', cache_size=0)
+dynamic_list = db.table('dynamic_list', cache_size=0)
 
 def replace_illegal(s: str):
     s = s.strip()
