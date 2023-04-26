@@ -5,6 +5,7 @@ import asyncio
 import glob
 import html
 import re
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
@@ -19,6 +20,7 @@ load_dotenv()
 DOWNLOAD_COOKIE = os.environ['DL_COOKIE']
 DB_PATH = os.environ['DB_PATH']
 
+MP4_FILE_PATH = lambda name: glob.glob(os.path.join('/media', f'{legal_title(name[:30])}*.mp4'))
 MEDIA_FILE_PATH = lambda name: glob.glob(os.path.join('/media', f'{legal_title(name[:30])}*'))
 ATTACHMENT_FILE_PATH = lambda name: glob.glob(os.path.join('/media/extra', f'{legal_title(name[:30])}*'))
 
@@ -26,6 +28,15 @@ db = TinyDB(DB_PATH)
 config = db.table('config')
 shazam_list = db.table('shazam_list', cache_size=0)
 dynamic_list = db.table('dynamic_list', cache_size=0)
+
+def get_video_resolution(filename):
+    cmd = ['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'json']
+    cmd.append(filename)
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    result_dict = json.loads(result.stdout)
+    width = result_dict['streams'][0]['width']
+    height = result_dict['streams'][0]['height']
+    return (width, height)
 
 def replace_illegal(s: str):
     s = s.strip()
@@ -55,6 +66,24 @@ async def task(d, bvid):
     # 下载中 100
     switch_dl_status(bvid, 100)
     await d.get_video(f'https://www.bilibili.com/video/{bvid}', image=True)
+
+def check_video_valid(bvid, title, max_quality):
+    mp4_files = MP4_FILE_PATH(title)
+    # 文件不存在
+    if len(mp4_files) == 0:
+        return switch_dl_status(bvid, -2)
+
+    # 分辨率不达标
+    width, height = get_video_resolution(mp4_files[0])
+    if '4K' in max_quality:
+        if (width <= 1920) and (height <= 1920):
+            return switch_dl_status(bvid, -3)
+    if '1080P' in max_quality:
+        if (width <= 1080) and (height <= 1080):
+            return switch_dl_status(bvid, -3)
+
+    # 下载文件检验成功
+    return switch_dl_status(bvid, 200)       
      
 # 下载视频列表
 async def download_video_list(li, err_cb):
@@ -63,11 +92,13 @@ async def download_video_list(li, err_cb):
     ret_list = await asyncio.gather(*coros, return_exceptions=True)
     for idx, item in enumerate(ret_list):
         item_bvid = li[idx]['bvid']
+        item_title = li[idx]['title']
+        item_max_quality = li[idx]['max_quality']
         if isinstance(item, Exception):
             switch_dl_status(item_bvid, -1)
             dynamic_list.update(increment('dl_retry'), where('bvid') == item_bvid)
         else:
-            switch_dl_status(item_bvid, 200)
+            check_video_valid(item_bvid, item_title, item_max_quality)
     await d.aclose()
 
 async def match_bgm(li, err_cb):

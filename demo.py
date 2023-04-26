@@ -10,7 +10,7 @@ import html
 import re
 from datetime import datetime
 from tinydb import TinyDB, Query, where
-from bilix import DownloaderBilibili
+# from bilix import DownloaderBilibili
 from flask import Flask, flash, request, render_template
 
 DB_PATH = './db.json'
@@ -115,3 +115,14 @@ dynamic_list2 = db2.table('dynamic_list')
 # asyncio.get_event_loop().run_until_complete(async_task())
 
 # print(dynamic_list.search(where('dstatus') == 100) or 1111)
+def replace_illegal(s: str):
+    s = s.strip()
+    s = html.unescape(s)  # handel & "...
+    s = re.sub(r"[/\\:*?\"<>|\n]", '', s)  # replace illegal filename character
+    return s
+def legal_title(*parts: str, join_str: str = '-'):
+    return join_str.join(filter(lambda x: len(x) > 0, map(replace_illegal, parts)))
+
+MP4_FILE_PATH = lambda name: glob.glob(os.path.join('\\\\HTPC\\Dance', f'{legal_title(name[:30])}*.mp4'))
+
+print(MP4_FILE_PATH('222'))
