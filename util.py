@@ -31,13 +31,14 @@ shazam_list = db.table('shazam_list', cache_size=0)
 dynamic_list = db.table('dynamic_list', cache_size=0)
 
 def get_video_resolution(filename):
-    cmd = ['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'json']
+    cmd = ['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height,bit_rate', '-of', 'json']
     cmd.append(filename)
     result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     result_dict = json.loads(result.stdout)
     width = result_dict['streams'][0]['width']
     height = result_dict['streams'][0]['height']
-    return (width, height)
+    bitrate = int(result_dict['streams'][0]['bit_rate'])
+    return (width, height, bitrate)
 
 def replace_illegal(s: str):
     s = s.strip()
@@ -59,32 +60,19 @@ def set_config(key, value):
     config.upsert({key: value}, where(key).exists())
 
 # 切换投稿下载状态
-def switch_dl_status(bvid, status):
+def switch_dl_status(bvid, status, title=None):
     dynamic_list.update({'dstatus': status}, where('bvid') == bvid)
+    if status < 0:
+        dynamic_list.update(increment('dl_retry'), where('bvid') == bvid)
+        if title:
+            find_and_remove(title)
 
 # 下载任务
 async def task(d, bvid):
     # 下载中 100
     switch_dl_status(bvid, 100)
     await d.get_video(f'https://www.bilibili.com/video/{bvid}', image=True)
-
-def check_video_valid(bvid, title, max_quality):
-    mp4_files = MP4_FILE_PATH(title)
-    # 文件不存在
-    if len(mp4_files) == 0:
-        return switch_dl_status(bvid, -2)
-
-    # 分辨率不达标
-    width, height = get_video_resolution(mp4_files[0])
-    if '4K' in max_quality:
-        if (width <= 1920) and (height <= 1920):
-            return switch_dl_status(bvid, -3)
-    if '1080P' in max_quality:
-        if (width <= 1080) and (height <= 1080):
-            return switch_dl_status(bvid, -3)
-
-    # 下载文件检验成功
-    return switch_dl_status(bvid, 200)       
+    
      
 # 下载视频列表
 async def download_video_list(li, err_cb):
@@ -95,11 +83,28 @@ async def download_video_list(li, err_cb):
         item_bvid = li[idx]['bvid']
         item_title = li[idx]['title']
         item_max_quality = li[idx]['max_quality']
+        item_retry_count = li[idx]['dl_retry']
         if isinstance(item, Exception):
             switch_dl_status(item_bvid, -1)
-            dynamic_list.update(increment('dl_retry'), where('bvid') == item_bvid)
         else:
-            check_video_valid(item_bvid, item_title, item_max_quality)
+            mp4_files = MP4_FILE_PATH(item_title)
+            # 文件不存在
+            if len(mp4_files) == 0:
+                return switch_dl_status(item_bvid, -2)
+            # 分辨率不达标
+            width, height, bitrate = get_video_resolution(mp4_files[0])
+            if '4K' in item_max_quality:
+                if (width <= 1920) and (height <= 1920):
+                    return switch_dl_status(item_bvid, -3, (item_retry_count < 3) and item_title)
+            if '1080P+' in item_max_quality:
+                if ((width <= 1080) and (height <= 1080)) or (bitrate < 2000e3):
+                    return switch_dl_status(item_bvid, -3, (item_retry_count < 3) and item_title)
+            if '1080P' in item_max_quality:
+                if (width <= 1080) and (height <= 1080):
+                    return switch_dl_status(item_bvid, -3, (item_retry_count < 3) and item_title)
+
+            # 下载文件检验成功
+            return switch_dl_status(item_bvid, 200)
     await d.aclose()
 
 async def match_bgm(li, err_cb):
