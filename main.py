@@ -40,8 +40,10 @@ def dynamic_list_api():
     size = int(request.args.get('size') or 50)
     # 0全部，1下载失败
     dtype = int(request.args.get('dtype') or 0)
-    q = where('dstatus') == -1 if dtype == 1 else where('bvid').exists()
-    all_list = sorted(dynamic_list.search(q), key=lambda i: i['pdate'], reverse=True)
+    # 所有失败类型
+    error_q = where('dstatus') < 0
+    q_list = dynamic_list.search(error_q) if dtype == 1 else dynamic_list.all()
+    all_list = sorted(q_list, key=lambda i: i['pdate'], reverse=True)
     total = len(all_list)
     st = (page - 1) * size
     ed = page * size

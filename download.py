@@ -190,8 +190,8 @@ async def async_task():
     q1 = (where('dstatus') == 100) & q_limit
     # 未下载
     q2 = (where('dstatus') == 0) & q_limit
-    # 可重试
-    q3 = ((where('dstatus') == -1) & (where('dl_retry') < 3)) & q_limit
+    # 下载失败 && 可重试
+    q3 = ((where('dstatus') < 0) & (where('dl_retry') < 3)) & q_limit
     ing_list = dynamic_list.search(q1)
     wait_list = dynamic_list.search(q2)
     retry_list = dynamic_list.search(q3)

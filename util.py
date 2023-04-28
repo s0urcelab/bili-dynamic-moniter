@@ -21,9 +21,9 @@ load_dotenv()
 DOWNLOAD_COOKIE = os.environ['DL_COOKIE']
 DB_PATH = os.environ['DB_PATH']
 
-MP4_FILE_PATH = lambda name: glob.glob(os.path.join('/media', f'{legal_title(name[:30])}*.mp4'))
-MEDIA_FILE_PATH = lambda name: glob.glob(os.path.join('/media', f'{legal_title(name[:30])}*'))
-ATTACHMENT_FILE_PATH = lambda name: glob.glob(os.path.join('/media/extra', f'{legal_title(name[:30])}*'))
+MP4_FILE_PATH = lambda name: glob.glob(os.path.join('/media', f'{glob.escape(legal_title(name[:30]))}*.mp4'))
+MEDIA_FILE_PATH = lambda name: glob.glob(os.path.join('/media', f'{glob.escape(legal_title(name[:30]))}*'))
+ATTACHMENT_FILE_PATH = lambda name: glob.glob(os.path.join('/media/extra', f'{glob.escape(legal_title(name[:30]))}*'))
 
 db = TinyDB(DB_PATH)
 config = db.table('config')

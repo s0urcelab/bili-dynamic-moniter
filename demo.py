@@ -123,6 +123,11 @@ def replace_illegal(s: str):
 def legal_title(*parts: str, join_str: str = '-'):
     return join_str.join(filter(lambda x: len(x) > 0, map(replace_illegal, parts)))
 
-MP4_FILE_PATH = lambda name: glob.glob(os.path.join('\\\\HTPC\\Dance', f'{legal_title(name[:30])}*.mp4'))
+def MP4_FILE_PATH(name):
+    n = name[:30]
+    l = legal_title(name[:30])
+    e = glob.escape(l)
+    print(e)
+    return glob.glob(os.path.join('\\\\HTPC\\Dance', f'{e}*.mp4'))
 
-print(MP4_FILE_PATH('222'))
+print(MP4_FILE_PATH('没想到吧我已经出去玩一圈回来了[星星眼]'))
