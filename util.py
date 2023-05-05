@@ -31,14 +31,17 @@ shazam_list = db.table('shazam_list', cache_size=0)
 dynamic_list = db.table('dynamic_list', cache_size=0)
 
 def get_video_resolution(filename):
-    cmd = ['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height,bit_rate', '-of', 'json']
+    cmd = ['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height,bit_rate,r_frame_rate', '-of', 'json']
     cmd.append(filename)
     result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     result_dict = json.loads(result.stdout)
     width = result_dict['streams'][0]['width']
     height = result_dict['streams'][0]['height']
     bitrate = int(result_dict['streams'][0]['bit_rate'])
-    return (width, height, bitrate)
+    frame_rate = result_dict['streams'][0]['r_frame_rate']
+    numerator, denominator = map(int, frame_rate.split('/'))
+    fps = numerator / denominator
+    return (width, height, bitrate, fps)
 
 def replace_illegal(s: str):
     s = s.strip()
@@ -92,9 +95,12 @@ async def download_video_list(li, err_cb):
             if len(mp4_files) == 0:
                 return switch_dl_status(item_bvid, -2)
             # 分辨率不达标
-            width, height, bitrate = get_video_resolution(mp4_files[0])
+            width, height, bitrate, fps = get_video_resolution(mp4_files[0])
             if '4K' in item_max_quality:
                 if (width <= 1920) and (height <= 1920):
+                    return switch_dl_status(item_bvid, -3, (item_retry_count < 3) and item_title)
+            if '1080P60' in item_max_quality:
+                if ((width <= 1080) and (height <= 1080)) or (fps < 50):
                     return switch_dl_status(item_bvid, -3, (item_retry_count < 3) and item_title)
             if '1080P+' in item_max_quality:
                 if ((width <= 1080) and (height <= 1080)) or (bitrate < 2000e3):

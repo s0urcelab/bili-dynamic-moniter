@@ -130,4 +130,4 @@ def MP4_FILE_PATH(name):
     print(e)
     return glob.glob(os.path.join('\\\\HTPC\\Dance', f'{e}*.mp4'))
 
-print(MP4_FILE_PATH('没想到吧我已经出去玩一圈回来了[星星眼]'))
+print(MP4_FILE_PATH('竖屏丨甜度超标!🍭 Apink - DND 翻跳'))
