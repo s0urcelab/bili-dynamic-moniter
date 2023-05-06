@@ -87,6 +87,7 @@ def refresh_title(item):
         new_title = res_json['data']['title']
         dynamic_list.update({'title': new_title}, where('bvid') == bvid)
         return {**item, 'title': new_title}
+    return item
      
 # 下载视频列表
 async def download_video_list(oli, err_cb):
