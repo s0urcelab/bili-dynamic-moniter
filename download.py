@@ -193,10 +193,10 @@ async def async_task():
     q2 = (where('dstatus') == 0) & q_limit
     # 下载失败 && 可重试
     q3 = ((where('dstatus') < 0) & (where('dl_retry') < 3)) & q_limit
-    # ing_list = sort_by_date(dynamic_list.search(q1))
+    ing_list = sort_by_date(dynamic_list.search(q1))
     wait_list = sort_by_date(dynamic_list.search(q2))
     retry_list = sort_by_date(dynamic_list.search(q3))
-    merge_list = [*wait_list, *retry_list]
+    merge_list = [*ing_list, *wait_list, *retry_list]
     
     await download_video_list(merge_list[:CONCURRENT_TASK_NUM], logger.warning)
 
