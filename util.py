@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import requests
 import asyncio
 import glob
 import html
@@ -18,6 +19,7 @@ from shazamio import Shazam, Serialize
 # 加载.env的环境变量
 load_dotenv()
 
+DYNAMIC_COOKIE = os.environ['FO_COOKIE']
 DOWNLOAD_COOKIE = os.environ['DL_COOKIE']
 DB_PATH = os.environ['DB_PATH']
 
@@ -75,11 +77,21 @@ async def task(d, bvid):
     # 下载中 100
     switch_dl_status(bvid, 100)
     await d.get_video(f'https://www.bilibili.com/video/{bvid}', image=True)
-    
+
+def refresh_title(item):
+    bvid = item['bvid']
+    cookie = {'SESSDATA': DYNAMIC_COOKIE}
+    res = requests.get(f'https://api.bilibili.com/x/web-interface/view?bvid={bvid}', cookies=cookie)
+    res_json = json.loads(res.text)
+    if res_json['code'] == 0:
+        new_title = res_json['data']['title']
+        dynamic_list.update({'title': new_title}, where('bvid') == bvid)
+        return {**item, 'title': new_title}
      
 # 下载视频列表
-async def download_video_list(li, err_cb):
+async def download_video_list(oli, err_cb):
     d = DownloaderBilibili(videos_dir='/media', sess_data=DOWNLOAD_COOKIE, video_concurrency=1, part_concurrency=1)
+    li = list(map(refresh_title, oli))
     coros = [task(d, i['bvid']) for i in li]
     ret_list = await asyncio.gather(*coros, return_exceptions=True)
     for idx, item in enumerate(ret_list):
