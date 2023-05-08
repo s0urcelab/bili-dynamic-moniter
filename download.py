@@ -1,33 +1,27 @@
 # -*- coding: utf-8 -*-
 
 import sys
-import os
 import re
 import requests
 import json
 import asyncio
 import logging
 from datetime import datetime
-from dotenv import load_dotenv
-from util import set_config, get_config, download_video_list
+from constant import *
+from util import set_config, get_config, get_mp4_path, get_video_resolution, switch_dl_status
 from tinydb import TinyDB, Query, where
+from bilix import DownloaderBilibili
 
-# 加载.env的环境变量
-load_dotenv()
 # 配置logger
-logger = logging.getLogger()
+formatter = '%(levelname)s %(message)s'
+logging.basicConfig(format=formatter, level=logging.INFO)
+logger = logging.getLogger('bdm')
 
-DB_PATH = os.environ['DB_PATH']
 USER_DYNAMIC_API = lambda page,offset: f'https://api.bilibili.com/x/polymer/web-dynamic/v1/feed/all?timezone_offset=-480&type=video&page={page}&features=itemOpusStyle&offset={offset}'
 USER_FOLLOW_API = lambda page: f'https://api.bilibili.com/x/relation/tag?mid=543741&tagid=37444368&pn={page}&ps=20'
 VIDEO_DETAIL_API = lambda bvid: f'https://www.bilibili.com/video/{bvid}'
 
-DYNAMIC_COOKIE = os.environ['FO_COOKIE']
-MAX_DYNAMIC_FETCH_PAGE = int(os.environ['MAX_DYNAMIC_FETCH_PAGE'])
-CONCURRENT_TASK_NUM = int(os.environ['CONCURRENT_TASK_NUM'])
-
 db = TinyDB(DB_PATH)
-config = db.table('config')
 dynamic_list = db.table('dynamic_list', cache_size=0)
 
 def fetch_follow(page): 
@@ -182,6 +176,94 @@ def update_dynamic(cpdate, uid_list):
     if dcount > 0:
         logger.info(f'发现并移除 {dcount} 条重复动态')
 
+
+# 下载任务
+async def task(d, item):
+    item_bvid = item['bvid']
+    item_title = item['title']
+    item_max_quality = item['max_quality']
+    item_retry_count = item['dl_retry']
+    
+    # 下载中 100
+    switch_dl_status(item_bvid, 100)
+    try:
+        await d.get_video(f'https://www.bilibili.com/video/{item_bvid}', image=True)
+
+        mp4_files = get_mp4_path(item_title)
+        # 文件不存在
+        if not mp4_files:
+            return switch_dl_status(item_bvid, -2)
+        # 分辨率不达标
+        width, height, bitrate, fps = get_video_resolution(mp4_files[0])
+        if '4K' in item_max_quality:
+            if (width <= 1920) and (height <= 1920):
+                return switch_dl_status(item_bvid, -3, (item_retry_count < 2) and item_title)
+        if '1080P60' in item_max_quality:
+            if ((width <= 1080) and (height <= 1080)) or (fps < 50):
+                return switch_dl_status(item_bvid, -3, (item_retry_count < 2) and item_title)
+        if '1080P+' in item_max_quality:
+            if ((width <= 1080) and (height <= 1080)) or (bitrate < 2000e3):
+                return switch_dl_status(item_bvid, -3, (item_retry_count < 2) and item_title)
+        if '1080P' in item_max_quality:
+            if (width <= 1080) and (height <= 1080):
+                return switch_dl_status(item_bvid, -3, (item_retry_count < 2) and item_title)
+
+        # 下载文件检验成功
+        switch_dl_status(item_bvid, 200)
+    except:
+        switch_dl_status(item_bvid, -1)
+
+def refresh_title(item):
+    bvid = item['bvid']
+    cookie = {'SESSDATA': DYNAMIC_COOKIE}
+    res = requests.get(f'https://api.bilibili.com/x/web-interface/view?bvid={bvid}', cookies=cookie)
+    res_json = json.loads(res.text)
+    if res_json['code'] == 0:
+        new_title = res_json['data']['title']
+        dynamic_list.update({'title': new_title}, where('bvid') == bvid)
+        return {**item, 'title': new_title}
+    return item
+     
+# 下载视频列表
+async def download_video_list(origin_list):
+    d = DownloaderBilibili(videos_dir=MEDIA_ROOT, sess_data=DOWNLOAD_COOKIE, video_concurrency=1, part_concurrency=1)
+    
+    for item in list(map(refresh_title, origin_list)):
+        await task(d, item)
+        
+    # coros = [task(d, i['bvid']) for i in li]
+    # ret_list = await asyncio.gather(*coros, return_exceptions=True)
+    # for idx, item in enumerate(ret_list):
+    #     item_bvid = li[idx]['bvid']
+    #     item_title = li[idx]['title']
+    #     item_max_quality = li[idx]['max_quality']
+    #     item_retry_count = li[idx]['dl_retry']
+    #     if isinstance(item, Exception):
+    #         switch_dl_status(item_bvid, -1)
+    #     else:
+    #         mp4_files = get_mp4_path(item_title)
+    #         # 文件不存在
+    #         if len(mp4_files) == 0:
+    #             return switch_dl_status(item_bvid, -2)
+    #         # 分辨率不达标
+    #         width, height, bitrate, fps = get_video_resolution(mp4_files[0])
+    #         if '4K' in item_max_quality:
+    #             if (width <= 1920) and (height <= 1920):
+    #                 return switch_dl_status(item_bvid, -3, (item_retry_count < 2) and item_title)
+    #         if '1080P60' in item_max_quality:
+    #             if ((width <= 1080) and (height <= 1080)) or (fps < 50):
+    #                 return switch_dl_status(item_bvid, -3, (item_retry_count < 2) and item_title)
+    #         if '1080P+' in item_max_quality:
+    #             if ((width <= 1080) and (height <= 1080)) or (bitrate < 2000e3):
+    #                 return switch_dl_status(item_bvid, -3, (item_retry_count < 2) and item_title)
+    #         if '1080P' in item_max_quality:
+    #             if (width <= 1080) and (height <= 1080):
+    #                 return switch_dl_status(item_bvid, -3, (item_retry_count < 2) and item_title)
+
+    #         # 下载文件检验成功
+    #         return switch_dl_status(item_bvid, 200)
+    await d.aclose()
+
 # async task
 async def async_task():
     sort_by_date = lambda li: sorted(li, key=lambda i: i['pdate'], reverse=True)
@@ -198,7 +280,7 @@ async def async_task():
     retry_list = sort_by_date(dynamic_list.search(q3))
     merge_list = [*ing_list, *wait_list, *retry_list]
     
-    await download_video_list(merge_list[:CONCURRENT_TASK_NUM], logger.warning)
+    await download_video_list(merge_list[:CONCURRENT_TASK_NUM])
 
 if __name__ == '__main__':
     logger.info('定时任务：开始获取最新动态')

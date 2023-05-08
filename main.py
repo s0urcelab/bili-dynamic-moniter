@@ -1,22 +1,16 @@
 # -*- coding: utf-8 -*-
 
-import io
 import os
-import requests
-import json
 import asyncio
 from datetime import datetime
-from util import get_config, set_config, switch_dl_status, find_and_remove
+from constant import *
+from util import set_config, switch_dl_status, find_and_remove
 from tinydb import TinyDB, Query, where
 from flask import Flask, flash, request
-
-DEBUG = os.environ.get('DEBUG')
-DB_PATH = os.environ['DB_PATH']
 
 app = Flask(__name__)
 
 db = TinyDB(DB_PATH)
-config = db.table('config')
 shazam_list = db.table('shazam_list', cache_size=0)
 dynamic_list = db.table('dynamic_list', cache_size=0)
 
@@ -60,7 +54,7 @@ def dynamic_list_api():
 # 占用空间情况
 @app.route('/api/folder.size')
 def folder_size():
-    def get_dir_size(path='/media'):
+    def get_dir_size(path=MEDIA_ROOT):
         total = 0
         with os.scandir(path) as it:
             for entry in it:
@@ -73,9 +67,10 @@ def folder_size():
     return {'code': 0, 'data': f'{get_dir_size()}GB'}
 
 # 重试下载视频
-@app.route('/api/retry/<bvids>')
-def retry_dl_video(bvids):
-    for bvid in bvids.split(','):
+@app.route('/api/retry', methods=['POST'])
+def retry_dl_video():
+    bvids = request.json
+    for bvid in bvids:
         target = dynamic_list.get(where('bvid') == bvid)
         if target != None:
             find_and_remove(target['title'])
@@ -99,11 +94,21 @@ def edit_title():
     return {'code': 0, 'data': '修改自定义标题成功'}
 
 # 投稿youtube
-@app.route('/api/upload.ytb/<bvids>')
-def upload_ytb(bvids):
-    for bvid in bvids.split(','):
+@app.route('/api/upload.ytb', methods=['POST'])
+def upload_ytb():
+    bvids = request.json
+    for bvid in bvids:
         dynamic_list.update({'ustatus': 100}, where('bvid') == bvid)
     return {'code': 0, 'data': '添加上传任务成功'}
+
+# 删除动态&视频
+@app.route('/api/delete.video', methods=['POST'])
+def delete_video():
+    del_list = request.json
+    for item in del_list:
+        find_and_remove(item['title'])
+        dynamic_list.remove(where('bvid') == item['bvid'])
+    return {'code': 0, 'data': '删除投稿成功'}
 
 # 删除该动态之后所有未投稿的视频
 @app.route('/api/delete.from/<pd>/to/<ts>')
@@ -118,4 +123,4 @@ def delete_from(pd, ts):
     return {'code': 0, 'data': f'共删除 {len(del_list)} 条动态及视频'}
 
 if __name__ == '__main__':
-    app.run(debug=DEBUG)
+    app.run(debug=False)
