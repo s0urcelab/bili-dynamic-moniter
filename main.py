@@ -14,6 +14,14 @@ db = TinyDB(DB_PATH)
 shazam_list = db.table('shazam_list', cache_size=0)
 dynamic_list = db.table('dynamic_list', cache_size=0)
 
+def add_shazam(item):
+    q = where('id') == item['shazam_id']
+    target = shazam_list.get(q)
+    if target != None:
+        return {**item, 'etitle': target['title']}
+    else:
+        return item
+
 # 托管静态资源
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
@@ -32,23 +40,23 @@ def init_cpdate(datestring):
 def dynamic_list_api():
     page = int(request.args.get('page') or 1)
     size = int(request.args.get('size') or 50)
-    # 0全部，1下载失败
+    # 0全部，1下载失败，2上传ytb失败
     dtype = int(request.args.get('dtype') or 0)
     # 所有失败类型
-    error_q = where('dstatus') < 0
-    q_list = dynamic_list.search(error_q) if dtype == 1 else dynamic_list.all()
+    dl_err_q = where('dstatus') < 0
+    up_err_q = where('ustatus') < 0
+    if dtype == 1:
+        q_list = dynamic_list.search(dl_err_q)
+    elif dtype == 2:
+        q_list = dynamic_list.search(up_err_q)
+    else:
+        q_list = dynamic_list.all()
     all_list = sorted(q_list, key=lambda i: i['pdate'], reverse=True)
     total = len(all_list)
     st = (page - 1) * size
     ed = page * size
     current_list = all_list[st:ed]
-    def add_shazam(item):
-        q = where('id') == item['shazam_id']
-        target = shazam_list.get(q)
-        if target != None:
-            return {**item, 'etitle': target['title']}
-        else:
-            return item
+    
     return {'code': 0, 'data': list(map(add_shazam, current_list)), 'total': total }
 
 # 占用空间情况
@@ -64,7 +72,17 @@ def folder_size():
                     total += get_dir_size(entry.path)
         return round(total / (1024 ** 3), 2)
     
-    return {'code': 0, 'data': f'{get_dir_size()}GB'}
+    dl_count = dynamic_list.count(where('dstatus') == 200)
+    up_count = dynamic_list.count(where('ustatus') == 200)
+    
+    return {
+        'code': 0,
+        'data': {
+            'size': f'{get_dir_size()}GB',
+            'downloaded': dl_count,
+            'uploaded': up_count,
+        }
+    }
 
 # 重试下载视频
 @app.route('/api/retry', methods=['POST'])

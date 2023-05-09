@@ -95,6 +95,7 @@ def fetch_dynamic(page, offset):
             'dstatus': 0,
             'dl_retry': 0,
             'ustatus': 0,
+            'up_retry': 0,
         }
 
     dlist = list(map(flat_data, res_json['data']['items']))
