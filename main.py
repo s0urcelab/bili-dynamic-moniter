@@ -78,6 +78,15 @@ def retry_dl_video():
             dynamic_list.update({'dl_retry': 0}, where('bvid') == bvid)
     return {'code': 0, 'data': f'重新加入下载列表'}
 
+# 重置BGM识别状态
+@app.route('/api/reset.bgm', methods=['POST'])
+def reset_bgm():
+    bvids = request.json
+    for bvid in bvids:
+        dynamic_list.update({'shazam_id': 0}, where('bvid') == bvid)
+
+    return {'code': 0, 'data': f'重置BGM识别状态'}
+
 # 修改推测bgm标题
 @app.route('/api/edit.title', methods=['POST'])
 def edit_title():

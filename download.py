@@ -266,7 +266,7 @@ async def download_video_list(origin_list):
 
 # async task
 async def async_task():
-    sort_by_date = lambda li: sorted(li, key=lambda i: i['pdate'], reverse=True)
+    sort_by_date = lambda li: sorted(li, key=lambda i: i['pdate'], reverse=False)
     # 时长小于10分钟
     q_limit = where('duration') < 600000
     # 下载中
