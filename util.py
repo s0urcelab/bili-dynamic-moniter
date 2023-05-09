@@ -31,6 +31,12 @@ def get_frag_path(name):
 def get_cover_path(name): 
     return glob.glob(os.path.join(MEDIA_ROOT, 'extra', f'{glob.escape(legal_title(name[:30]))}*'))
 
+def get_local_mp4(hash):
+    return glob.glob(os.path.join(MEDIA_ROOT, 'manual', f'*{hash}*.mp4'))
+
+def get_local_cover(hash):
+    return glob.glob(os.path.join(MEDIA_ROOT, 'manual', f'*{hash}*.png'))
+
 def get_video_resolution(filename):
     cmd = ['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height,bit_rate,r_frame_rate', '-of', 'json']
     cmd.append(filename)
