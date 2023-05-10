@@ -13,8 +13,8 @@ logging.basicConfig(format=formatter, level=logging.INFO)
 logger = logging.getLogger('bdm')
 
 db = TinyDB(DB_PATH)
-dynamic_list = db.table('dynamic_list', cache_size=0)
-shazam_list = db.table('shazam_list', cache_size=0)
+dynamic_list = db.table('dynamic_list')
+shazam_list = db.table('shazam_list')
 
 shazam = Shazam()
 
@@ -56,3 +56,5 @@ async def main():
 if __name__ == '__main__':
     logger.info('定时任务：匹配BGM')
     asyncio.get_event_loop().run_until_complete(main())
+    # 关闭数据库
+    db.close()

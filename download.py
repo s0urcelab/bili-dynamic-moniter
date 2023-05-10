@@ -8,8 +8,9 @@ import asyncio
 import logging
 from datetime import datetime
 from constant import *
-from util import set_config, get_config, get_mp4_path, get_video_resolution, switch_dl_status
+from util import get_mp4_path, get_video_resolution, find_and_remove
 from tinydb import TinyDB, Query, where
+from tinydb.operations import increment
 from bilix import DownloaderBilibili
 
 # 配置logger
@@ -18,7 +19,27 @@ logging.basicConfig(format=formatter, level=logging.INFO)
 logger = logging.getLogger('bdm')
 
 db = TinyDB(DB_PATH)
-dynamic_list = db.table('dynamic_list', cache_size=0)
+dynamic_list = db.table('dynamic_list')
+config = db.table('config')
+
+def get_config(key):
+    is_exist = where(key).exists()
+    t = config.get(is_exist)
+    if t != None:
+        return t[key]
+    else:
+        return t
+    
+def set_config(key, value):
+    config.upsert({key: value}, where(key).exists())
+    
+# 切换投稿下载状态
+def switch_dl_status(bvid, status, title=None):
+    dynamic_list.update({'dstatus': status}, where('bvid') == bvid)
+    if status < 0:
+        dynamic_list.update(increment('dl_retry'), where('bvid') == bvid)
+        if title:
+            find_and_remove(title)
 
 def fetch_follow(page): 
     cookie = {'SESSDATA': DYNAMIC_COOKIE}
@@ -252,3 +273,4 @@ if __name__ == '__main__':
     logger.info('定时任务：开始获取最新动态')
     update_dynamic(get_config('check_point'), update_follow())
     asyncio.get_event_loop().run_until_complete(async_task())
+    db.close()

@@ -7,19 +7,34 @@ import asyncio
 import requests
 from datetime import datetime
 from constant import *
-from util import set_config, switch_dl_status, find_and_remove
+from util import find_and_remove
 from tinydb import TinyDB, Query, where
-from flask import Flask, flash, request
+from flask import Flask, g, request
 
 app = Flask(__name__)
 
-db = TinyDB(DB_PATH)
-shazam_list = db.table('shazam_list', cache_size=0)
-dynamic_list = db.table('dynamic_list', cache_size=0)
+@app.before_request
+def before_request():
+    """
+    在请求处理函数之前打开数据库连接
+    """
+    db = TinyDB(DB_PATH)
+    g.db = db
+    g.shazam_list = db.table('shazam_list')
+    g.dynamic_list = db.table('dynamic_list')
+    g.config = db.table('config')
+
+@app.after_request
+def after_request(response):
+    """
+    在请求处理函数之后关闭数据库连接
+    """
+    g.db.close()
+    return response
 
 def add_shazam(item):
     q = where('id') == item['shazam_id']
-    target = shazam_list.get(q)
+    target = g.shazam_list.get(q)
     if target != None:
         return {**item, 'etitle': target['title']}
     else:
@@ -84,7 +99,7 @@ def catch_all(path):
 @app.route('/api/init/<datestring>')
 def init_cpdate(datestring):
     cpdate = int(datetime.strptime(datestring, "%Y-%m-%d %H:%M:%S").timestamp())
-    set_config('check_point', cpdate)
+    g.config.upsert({'check_point': cpdate}, where('check_point').exists())
     return {'code': 0, 'data': f'动态截止日期初始化为：{datestring}'}
 
 # 动态列表
@@ -98,11 +113,11 @@ def dynamic_list_api():
     dl_err_q = where('dstatus') < 0
     up_err_q = where('ustatus') < 0
     if dtype == 1:
-        q_list = dynamic_list.search(dl_err_q)
+        q_list = g.dynamic_list.search(dl_err_q)
     elif dtype == 2:
-        q_list = dynamic_list.search(up_err_q)
+        q_list = g.dynamic_list.search(up_err_q)
     else:
-        q_list = dynamic_list.all()
+        q_list = g.dynamic_list.all()
     all_list = sorted(q_list, key=lambda i: i['pdate'], reverse=True)
     total = len(all_list)
     st = (page - 1) * size
@@ -124,8 +139,8 @@ def folder_size():
                     total += get_dir_size(entry.path)
         return round(total / (1024 ** 3), 2)
     
-    dl_count = dynamic_list.count(where('dstatus') == 200)
-    up_count = dynamic_list.count(where('ustatus') == 200)
+    dl_count = g.dynamic_list.count(where('dstatus') == 200)
+    up_count = g.dynamic_list.count(where('ustatus') == 200)
     
     return {
         'code': 0,
@@ -141,10 +156,10 @@ def folder_size():
 def retry_dl_video():
     bvids = request.json
     for bvid in bvids:
-        target = dynamic_list.get(where('bvid') == bvid)
+        target = g.dynamic_list.get(where('bvid') == bvid)
         if target != None:
             find_and_remove(target['title'])
-            dynamic_list.update({'dstatus': 0, 'dl_retry': 0, 'ustatus': 100}, where('bvid') == bvid)
+            g.dynamic_list.update({'dstatus': 0, 'dl_retry': 0, 'ustatus': 100}, where('bvid') == bvid)
     return {'code': 0, 'data': f'重新加入下载列表'}
 
 # 重置BGM识别状态
@@ -152,7 +167,7 @@ def retry_dl_video():
 def reset_bgm():
     bvids = request.json
     for bvid in bvids:
-        dynamic_list.update({'shazam_id': 0}, where('bvid') == bvid)
+        g.dynamic_list.update({'shazam_id': 0}, where('bvid') == bvid)
 
     return {'code': 0, 'data': f'重置BGM识别状态'}
 
@@ -165,10 +180,10 @@ def edit_title():
     etitle = js['etitle']
     # shazam_id不存在，直接存储
     if shazam_id in [0, -1, -2, -3]:
-        dynamic_list.update({'etitle': etitle}, where('bvid') == bvid)
+        g.dynamic_list.update({'etitle': etitle}, where('bvid') == bvid)
     # shazam_id存在，修改shazam_title
     else:
-        shazam_list.update({'title': etitle}, where('id') == shazam_id)
+        g.shazam_list.update({'title': etitle}, where('id') == shazam_id)
     return {'code': 0, 'data': '修改自定义标题成功'}
 
 # 投稿youtube
@@ -176,7 +191,7 @@ def edit_title():
 def upload_ytb():
     bvids = request.json
     for bvid in bvids:
-        dynamic_list.update({'ustatus': 100}, where('bvid') == bvid)
+        g.dynamic_list.update({'ustatus': 100}, where('bvid') == bvid)
     return {'code': 0, 'data': '添加上传任务成功'}
 
 # 删除动态&视频
@@ -185,7 +200,7 @@ def delete_video():
     del_list = request.json
     for item in del_list:
         find_and_remove(item['title'])
-        dynamic_list.remove(where('bvid') == item['bvid'])
+        g.dynamic_list.remove(where('bvid') == item['bvid'])
     return {'code': 0, 'data': '删除投稿成功'}
 
 # 删除该动态之后所有未投稿的视频
@@ -194,20 +209,20 @@ def delete_from(pd, ts):
     pdate = int(pd)
     timestamp = int(ts)
     q = (where('pdate') >= pdate) & (where('pdate') <= timestamp) & (where('ustatus') == 0)
-    del_list = dynamic_list.search(q)
+    del_list = g.dynamic_list.search(q)
     for item in del_list:
         find_and_remove(item['title'])
-    dynamic_list.remove(q)
+    g.dynamic_list.remove(q)
     return {'code': 0, 'data': f'共删除 {len(del_list)} 条动态及视频'}
 
 # 外部导入bvid
 @app.route('/api/add.bvid/<bvid>')
 def add_bvid(bvid):
-    if dynamic_list.count(where('bvid') == bvid):
+    if g.dynamic_list.count(where('bvid') == bvid):
         return {'code': -1, 'data': 'bvid已存在'}
     try:
         item = get_video_data(bvid)
-        dynamic_list.insert(item)
+        g.dynamic_list.insert(item)
         
         return {'code': 0, 'data': '导入bvid成功'}
     except Exception as err:

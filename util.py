@@ -7,12 +7,6 @@ import re
 import json
 import subprocess
 from constant import *
-from tinydb import TinyDB, Query, where
-from tinydb.operations import increment
-
-db = TinyDB(DB_PATH)
-config = db.table('config')
-dynamic_list = db.table('dynamic_list', cache_size=0)
 
 def replace_illegal(s: str):
     s = s.strip()
@@ -49,25 +43,6 @@ def get_video_resolution(filename):
     numerator, denominator = map(int, frame_rate.split('/'))
     fps = numerator / denominator
     return (width, height, bitrate, fps)
-    
-def get_config(key):
-    is_exist = where(key).exists()
-    t = config.get(is_exist)
-    if t != None:
-        return t[key]
-    else:
-        return t
-
-def set_config(key, value):
-    config.upsert({key: value}, where(key).exists())
-
-# 切换投稿下载状态
-def switch_dl_status(bvid, status, title=None):
-    dynamic_list.update({'dstatus': status}, where('bvid') == bvid)
-    if status < 0:
-        dynamic_list.update(increment('dl_retry'), where('bvid') == bvid)
-        if title:
-            find_and_remove(title)
 
 # 查找本地文件并删除
 def find_and_remove(name):
