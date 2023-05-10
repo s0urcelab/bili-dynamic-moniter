@@ -113,7 +113,7 @@ def edit_title():
     shazam_id = js['shazam_id']
     etitle = js['etitle']
     # shazam_id不存在，直接存储
-    if shazam_id in [0, -1]:
+    if shazam_id in [0, -1, -2, -3]:
         dynamic_list.update({'etitle': etitle}, where('bvid') == bvid)
     # shazam_id存在，修改shazam_title
     else:
