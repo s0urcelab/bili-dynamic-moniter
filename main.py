@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import os
+import re
+import json
 import asyncio
+import requests
 from datetime import datetime
 from constant import *
 from util import set_config, switch_dl_status, find_and_remove
@@ -22,6 +25,55 @@ def add_shazam(item):
     else:
         return item
 
+def get_video_data(bvid):
+    cookie = {'SESSDATA': DYNAMIC_COOKIE}
+    res_view = requests.get(VIDEO_VIEW_API(bvid), cookies=cookie)
+    res_json = json.loads(res_view.text)
+    if res_json['code'] != 0:
+        raise Exception(f'拉取bvid信息失败，检查：{bvid}')
+
+    res_detail = requests.get(VIDEO_DETAIL_API(bvid))
+    try:
+        play_info = re.search(r'<script>window.__playinfo__=([^<]+)</script>', res_detail.text)
+        pinfo = json.loads(play_info.group(1))
+    except:
+        raise Exception(f'拉取bvid信息失败，检查：{bvid}')
+
+    title = res_json['data']['title']
+    pdate = res_json['data']['pubdate']
+    pdstr = datetime.fromtimestamp(pdate).strftime("%Y-%m-%d %H:%M:%S")
+    desc = res_json['data']['desc']
+    cover = res_json['data']['pic']
+    duration = res_json['data']['duration']
+    uid = res_json['data']['owner']['mid']
+    uname = res_json['data']['owner']['name']
+    avatar = res_json['data']['owner']['face']
+    max_quality = pinfo['data']['accept_description'][0]
+    vwidth = pinfo['data']['dash']['video'][0]['width']
+    vheight = pinfo['data']['dash']['video'][0]['height']
+    is_portrait = 1 if (vwidth / vheight < 1) else 0
+    
+    return {
+        'from_import': 1,
+        'uid': uid,
+        'uname': uname,
+        'title': title,
+        'bvid': bvid,
+        'cover': cover,
+        'desc': desc,
+        'duration': duration,
+        'avatar': avatar, 
+        'pdate': pdate, 
+        'pdstr': pdstr,
+        'is_portrait': is_portrait,
+        'max_quality': max_quality,
+        'shazam_id': 0,
+        'dstatus': 0,
+        'dl_retry': 0,
+        'ustatus': 100,
+        'up_retry': 0,
+    }
+    
 # 托管静态资源
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
@@ -92,8 +144,7 @@ def retry_dl_video():
         target = dynamic_list.get(where('bvid') == bvid)
         if target != None:
             find_and_remove(target['title'])
-            switch_dl_status(bvid, 0)
-            dynamic_list.update({'dl_retry': 0}, where('bvid') == bvid)
+            dynamic_list.update({'dstatus': 0, 'dl_retry': 0, 'ustatus': 100}, where('bvid') == bvid)
     return {'code': 0, 'data': f'重新加入下载列表'}
 
 # 重置BGM识别状态
@@ -148,6 +199,20 @@ def delete_from(pd, ts):
         find_and_remove(item['title'])
     dynamic_list.remove(q)
     return {'code': 0, 'data': f'共删除 {len(del_list)} 条动态及视频'}
+
+# 外部导入bvid
+@app.route('/api/add.bvid/<bvid>')
+def add_bvid(bvid):
+    if dynamic_list.count(where('bvid') == bvid):
+        return {'code': -1, 'data': 'bvid已存在'}
+    try:
+        item = get_video_data(bvid)
+        dynamic_list.insert(item)
+        
+        return {'code': 0, 'data': '导入bvid成功'}
+    except Exception as err:
+        
+        return {'code': -2, 'data': str(err)}
 
 if __name__ == '__main__':
     app.run(debug=False)

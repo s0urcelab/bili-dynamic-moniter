@@ -17,10 +17,6 @@ formatter = '%(levelname)s %(message)s'
 logging.basicConfig(format=formatter, level=logging.INFO)
 logger = logging.getLogger('bdm')
 
-USER_DYNAMIC_API = lambda page,offset: f'https://api.bilibili.com/x/polymer/web-dynamic/v1/feed/all?timezone_offset=-480&type=video&page={page}&features=itemOpusStyle&offset={offset}'
-USER_FOLLOW_API = lambda page: f'https://api.bilibili.com/x/relation/tag?mid=543741&tagid=37444368&pn={page}&ps=20'
-VIDEO_DETAIL_API = lambda bvid: f'https://www.bilibili.com/video/{bvid}'
-
 db = TinyDB(DB_PATH)
 dynamic_list = db.table('dynamic_list', cache_size=0)
 
@@ -188,7 +184,7 @@ async def task(d, item):
     # 下载中 100
     switch_dl_status(item_bvid, 100)
     try:
-        await d.get_video(f'https://www.bilibili.com/video/{item_bvid}', image=True)
+        await d.get_video(VIDEO_DETAIL_API(item_bvid), image=True)
 
         mp4_files = get_mp4_path(item_title)
         # 文件不存在
@@ -217,7 +213,7 @@ async def task(d, item):
 def refresh_title(item):
     bvid = item['bvid']
     cookie = {'SESSDATA': DYNAMIC_COOKIE}
-    res = requests.get(f'https://api.bilibili.com/x/web-interface/view?bvid={bvid}', cookies=cookie)
+    res = requests.get(VIDEO_VIEW_API(bvid), cookies=cookie)
     res_json = json.loads(res.text)
     if res_json['code'] == 0:
         new_title = res_json['data']['title']
@@ -231,38 +227,7 @@ async def download_video_list(origin_list):
     
     for item in list(map(refresh_title, origin_list)):
         await task(d, item)
-        
-    # coros = [task(d, i['bvid']) for i in li]
-    # ret_list = await asyncio.gather(*coros, return_exceptions=True)
-    # for idx, item in enumerate(ret_list):
-    #     item_bvid = li[idx]['bvid']
-    #     item_title = li[idx]['title']
-    #     item_max_quality = li[idx]['max_quality']
-    #     item_retry_count = li[idx]['dl_retry']
-    #     if isinstance(item, Exception):
-    #         switch_dl_status(item_bvid, -1)
-    #     else:
-    #         mp4_files = get_mp4_path(item_title)
-    #         # 文件不存在
-    #         if len(mp4_files) == 0:
-    #             return switch_dl_status(item_bvid, -2)
-    #         # 分辨率不达标
-    #         width, height, bitrate, fps = get_video_resolution(mp4_files[0])
-    #         if '4K' in item_max_quality:
-    #             if (width <= 1920) and (height <= 1920):
-    #                 return switch_dl_status(item_bvid, -3, (item_retry_count < 2) and item_title)
-    #         if '1080P60' in item_max_quality:
-    #             if ((width <= 1080) and (height <= 1080)) or (fps < 50):
-    #                 return switch_dl_status(item_bvid, -3, (item_retry_count < 2) and item_title)
-    #         if '1080P+' in item_max_quality:
-    #             if ((width <= 1080) and (height <= 1080)) or (bitrate < 2000e3):
-    #                 return switch_dl_status(item_bvid, -3, (item_retry_count < 2) and item_title)
-    #         if '1080P' in item_max_quality:
-    #             if (width <= 1080) and (height <= 1080):
-    #                 return switch_dl_status(item_bvid, -3, (item_retry_count < 2) and item_title)
 
-    #         # 下载文件检验成功
-    #         return switch_dl_status(item_bvid, 200)
     await d.aclose()
 
 # async task
