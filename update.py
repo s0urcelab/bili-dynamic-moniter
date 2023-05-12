@@ -8,9 +8,6 @@ from datetime import datetime
 from constant import *
 from tinydb import TinyDB, Query, where
 
-# 配置logger
-# formatter = '%(asctime)s %(levelname)s %(message)s'
-# logging.basicConfig(format=formatter, datefmt='%Y-%m-%d %H:%M:%S', level=logging.INFO)
 logger = logging.getLogger('bdm')
 
 def update():
@@ -146,6 +143,7 @@ def update():
         """
         获取截止时间 check_point 前的所有关注用户 uid_list 的动态
         """
+        logger.info('定时任务：获取最新动态')
         cpdate = get_config('check_point')
         uid_list = refresh_follow()
         flist = []
