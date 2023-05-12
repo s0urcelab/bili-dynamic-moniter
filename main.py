@@ -158,7 +158,7 @@ def retry_dl_video():
     for bvid in bvids:
         target = g.dynamic_list.get(where('bvid') == bvid)
         if target != None:
-            find_and_remove(target['title'])
+            find_and_remove(target)
             g.dynamic_list.update({'dstatus': 0, 'dl_retry': 0, 'ustatus': 100}, where('bvid') == bvid)
     return {'code': 0, 'data': f'重新加入下载列表'}
 
@@ -199,7 +199,7 @@ def upload_ytb():
 def delete_video():
     del_list = request.json
     for item in del_list:
-        find_and_remove(item['title'])
+        find_and_remove(item)
         g.dynamic_list.remove(where('bvid') == item['bvid'])
     return {'code': 0, 'data': '删除投稿成功'}
 
@@ -211,7 +211,7 @@ def delete_from(pd, ts):
     q = (where('pdate') >= pdate) & (where('pdate') <= timestamp) & (where('ustatus') == 0)
     del_list = g.dynamic_list.search(q)
     for item in del_list:
-        find_and_remove(item['title'])
+        find_and_remove(item)
     g.dynamic_list.remove(q)
     return {'code': 0, 'data': f'共删除 {len(del_list)} 条动态及视频'}
 
