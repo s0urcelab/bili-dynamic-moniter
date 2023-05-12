@@ -10,7 +10,7 @@ from yt_dlp import YoutubeDL
 logger = logging.getLogger('bdm')
 
 class DownloadError(Exception):
-    def __init__(self, message, code=-1):
+    def __init__(self, message, code):
         self.message = message
         self.code = code
 
@@ -80,12 +80,16 @@ def download():
             # 下载文件检验成功
             switch_dl_status(item_bvid, 200)
             logger.info(f'下载成功：{item_title}')
-        except Exception as err:
+        except DownloadError as err:
             if err.code == -3:
                 switch_dl_status(item_bvid, err.code, (item_retry_count < 2) and item)
             else:
                 switch_dl_status(item_bvid, err.code)
-            logger.error(f'下载失败[{err.code}]： {item_title}')
+            logger.error(f'下载失败[{err}]： {item_title}')
+        except Exception as err:
+            switch_dl_status(item_bvid, -1)
+            logger.error(f'下载失败[YoutubeDL]： {item_title}')
+            logger.error(err)
 
     # def refresh_title(item):
     #     bvid = item['bvid']

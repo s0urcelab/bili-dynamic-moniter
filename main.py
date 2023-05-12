@@ -69,7 +69,8 @@ def get_video_data(bvid):
     is_portrait = 1 if (vwidth / vheight < 1) else 0
     
     return {
-        'from_import': 1,
+        # 外部导入source：1
+        'source': 1,
         'uid': uid,
         'uname': uname,
         'title': title,

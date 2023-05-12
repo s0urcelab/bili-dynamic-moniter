@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
-
-import sys
+import re
 import requests
 import json
 import logging
@@ -33,8 +32,8 @@ def update():
             res_json = json.loads(res.text)
 
             if res_json['code'] != 0:
-                logger.error('获取关注列表失败，终止执行')
-                sys.exit() 
+                # logger.error()
+                raise Exception('获取关注列表失败，终止执行')
             return res_json['data']
 
         def fetch_detail(item):
@@ -69,8 +68,7 @@ def update():
             res_json = json.loads(res.text)
 
             if res_json['code'] != 0:
-                logger.error('获取动态失败，终止执行')
-                sys.exit()
+                raise Exception('获取动态失败，终止执行')
             
             def flat_data(item):
                 uid = item['modules']['module_author']['mid']
