@@ -1,10 +1,15 @@
-
+import logging
 import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from update import update
 from match import match
 from download import download
+
+# 配置logger
+formatter = '%(asctime)s %(levelname)s %(message)s'
+logging.basicConfig(format=formatter, datefmt='%Y-%m-%d %H:%M:%S', level=logging.INFO)
+logger = logging.getLogger('bdm')
 
 if __name__ == '__main__':
     scheduler = AsyncIOScheduler(timezone='Asia/Shanghai')

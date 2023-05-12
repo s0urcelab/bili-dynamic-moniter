@@ -6,13 +6,13 @@ from util import get_mp4_path, get_video_resolution, find_and_remove, legal_titl
 from tinydb import TinyDB, Query, where
 from tinydb.operations import increment
 from yt_dlp import YoutubeDL
-    
+
+# 配置logger
+# formatter = '%(asctime)s %(levelname)s %(message)s'
+# logging.basicConfig(format=formatter, datefmt='%Y-%m-%d %H:%M:%S', level=logging.INFO)
+logger = logging.getLogger('bdm')
+
 def download():
-    # 配置logger
-    formatter = '%(asctime)s %(levelname)s %(message)s'
-    logging.basicConfig(format=formatter, datefmt='%Y-%m-%d %H:%M:%S', level=logging.INFO)
-    logger = logging.getLogger('bdm')
-    
     # 连接数据库
     with TinyDB(DB_PATH) as db:
         dynamic_list = db.table('dynamic_list')

@@ -8,12 +8,12 @@ from datetime import datetime
 from constant import *
 from tinydb import TinyDB, Query, where
 
+# 配置logger
+# formatter = '%(asctime)s %(levelname)s %(message)s'
+# logging.basicConfig(format=formatter, datefmt='%Y-%m-%d %H:%M:%S', level=logging.INFO)
+logger = logging.getLogger('bdm')
+
 def update():
-    # 配置logger
-    formatter = '%(asctime)s %(levelname)s %(message)s'
-    logging.basicConfig(format=formatter, datefmt='%Y-%m-%d %H:%M:%S', level=logging.INFO)
-    logger = logging.getLogger('bdm')
-    
     # 连接数据库
     with TinyDB(DB_PATH) as db:
         dynamic_list = db.table('dynamic_list')

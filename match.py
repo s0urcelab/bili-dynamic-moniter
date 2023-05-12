@@ -6,12 +6,13 @@ from util import get_mp4_path
 from tinydb import TinyDB, Query, where
 from shazamio import Shazam, Serialize
 
+# 配置logger
+# formatter = '%(asctime)s %(levelname)s %(message)s'
+# logging.basicConfig(format=formatter, datefmt='%Y-%m-%d %H:%M:%S', level=logging.INFO)
+logger = logging.getLogger('bdm')
+    
 async def match():
     shazam = Shazam()
-    # 配置logger
-    formatter = '%(asctime)s %(levelname)s %(message)s'
-    logging.basicConfig(format=formatter, datefmt='%Y-%m-%d %H:%M:%S', level=logging.INFO)
-    logger = logging.getLogger('bdm')
     
     # 连接数据库
     with TinyDB(DB_PATH) as db:
