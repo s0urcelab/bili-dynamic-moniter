@@ -172,6 +172,15 @@ def reset_bgm():
 
     return {'code': 0, 'data': f'重置BGM识别状态'}
 
+# 重置上传状态
+@app.route('/api/reset.upload', methods=['POST'])
+def reset_upload():
+    bvids = request.json
+    for bvid in bvids:
+        g.dynamic_list.update({'ustatus': 100, 'up_retry': 0}, where('bvid') == bvid)
+
+    return {'code': 0, 'data': f'重置上传状态成功'}
+
 # 修改推测bgm标题
 @app.route('/api/edit.title', methods=['POST'])
 def edit_title():
