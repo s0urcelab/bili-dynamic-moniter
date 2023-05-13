@@ -149,8 +149,8 @@ def update():
         offset = ''
 
         while (page < MAX_DYNAMIC_FETCH_PAGE):
-            re = fetch_dynamic(page, offset)
-            page_list = re['dlist']
+            single_part = fetch_dynamic(page, offset)
+            page_list = single_part['dlist']
 
             matchs = [i for (i, item) in enumerate(page_list) if item['pdate'] <= cpdate]
             if len(matchs) > 0:
@@ -160,7 +160,7 @@ def update():
 
             flist.extend(page_list)
             page = page + 1
-            offset = re['offset']
+            offset = single_part['offset']
 
         filter_list = list(filter(lambda i: i['uid'] in uid_list, flist))
 
