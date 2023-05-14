@@ -29,7 +29,7 @@ def get_mp4_path(item):
     if source in [0, 1]:
         return glob.glob(os.path.join(MEDIA_ROOT, f'{title}*.mp4'))
     else:
-        key = item['bvid'] if (source == 2) else item['source']
+        key = item['vid'] if (source in [2, 3]) else item['source']
         return glob.glob(os.path.join(MEDIA_ROOT, f'*{key}*.mp4'))
 
 def get_cover_path(item):
@@ -38,15 +38,15 @@ def get_cover_path(item):
     if source in [0, 1]:
         return glob.glob(os.path.join(MEDIA_ROOT, f'{title}*.jpg'))
     else:
-        key = item['bvid'] if (source == 2) else item['source']
+        key = item['vid'] if (source in [2, 3]) else item['source']
         result = []
         for ext in ('.jpg', '.png'):
             files = glob.glob(os.path.join(MEDIA_ROOT, f'*{key}*{ext}'))
             result.extend(files)
         return result
 
-def get_frag_path(bvid):
-    return glob.glob(os.path.join(MEDIA_ROOT, f'*-{bvid}*'))
+def get_frag_path(vid):
+    return glob.glob(os.path.join(MEDIA_ROOT, f'*-{vid}*'))
 
 def get_video_resolution(filename):
     cmd = ['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height,bit_rate,r_frame_rate', '-of', 'json']
@@ -63,7 +63,7 @@ def get_video_resolution(filename):
 
 # 查找本地文件并删除
 def find_and_remove(item):
-    for i in get_frag_path(item['bvid']):
+    for i in get_frag_path(item['vid']):
         os.remove(i)
     for i in get_mp4_path(item):
         os.remove(i)

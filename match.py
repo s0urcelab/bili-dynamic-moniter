@@ -18,13 +18,13 @@ async def shazam_match():
     
         async def shazam_bgm(match_list):
             for item in match_list:
-                bvid = item['bvid']
+                vid = item['vid']
                 origin_title = item['title']
                 
                 local_path = get_mp4_path(item)
                 if not local_path:
                     # 本地文件不存在
-                    dynamic_list.update({'shazam_id': -2}, where('bvid') == bvid)
+                    dynamic_list.update({'shazam_id': -2}, where('vid') == vid)
                     logger.error(f'无法识别该视频：{origin_title}，本地文件可能不存在')
                     continue
                     
@@ -33,17 +33,17 @@ async def shazam_match():
                     sez = Serialize.full_track(possible_song)
                     if len(sez.matches) == 0:
                         # 未找到匹配的bgm
-                        dynamic_list.update({'shazam_id': -1}, where('bvid') == bvid)
+                        dynamic_list.update({'shazam_id': -1}, where('vid') == vid)
                         continue
                     
                     # 匹配成功
                     shazam_id = sez.matches[0].id
                     shazam_title = sez.track.title
-                    dynamic_list.update({'shazam_id': shazam_id}, where('bvid') == bvid)
+                    dynamic_list.update({'shazam_id': shazam_id}, where('vid') == vid)
                     if not shazam_list.contains(where('id') == shazam_id):
                         shazam_list.insert({'id': shazam_id, 'title': shazam_title})
                 except:
-                    dynamic_list.update({'shazam_id': -3}, where('bvid') == bvid)
+                    dynamic_list.update({'shazam_id': -3}, where('vid') == vid)
                     logger.error(f'shazam错误：{origin_title}')
     
         logger.info('定时任务：匹配BGM')   

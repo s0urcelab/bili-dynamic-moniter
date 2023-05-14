@@ -37,7 +37,7 @@ def update():
             return res_json['data']
 
         def fetch_detail(item):
-            bvid = item['bvid']
+            bvid = item['vid']
             duration_text = item['duration_text']
             res = requests.get(VIDEO_DETAIL_API(bvid))
             try:
@@ -82,12 +82,11 @@ def update():
                 desc = item['modules']['module_dynamic']['major']['archive']['desc']
                 duration_text = item['modules']['module_dynamic']['major']['archive']['duration_text']
                 return {
-                    # 启用新下载器source=2
                     'source': 2,
                     'uid': uid,
                     'uname': uname,
                     'title': title,
-                    'bvid': bvid,
+                    'vid': bvid,
                     'cover': cover,
                     'desc': desc,
                     'duration_text': duration_text,
@@ -129,7 +128,7 @@ def update():
             seen = set()
             dupes = []
             for item in full_list:
-                bvid = item['bvid']
+                bvid = item['vid']
                 doc_id = item.doc_id
                 if bvid in seen:
                     dupes.append(doc_id)

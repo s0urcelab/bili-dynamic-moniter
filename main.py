@@ -3,6 +3,7 @@
 import os
 import re
 import json
+import time
 import asyncio
 import requests
 from datetime import datetime
@@ -40,26 +41,28 @@ def add_shazam(item):
     else:
         return item
 
-def get_video_data(bvid):
+def parseBV(bvid):
     cookie = {'SESSDATA': DYNAMIC_COOKIE}
     res_view = requests.get(VIDEO_VIEW_API(bvid), cookies=cookie)
     res_json = json.loads(res_view.text)
     if res_json['code'] != 0:
-        raise Exception(f'拉取bvid信息失败，检查：{bvid}')
+        raise Exception(f'解析bvid失败')
 
     res_detail = requests.get(VIDEO_DETAIL_API(bvid))
     try:
         play_info = re.search(r'<script>window.__playinfo__=([^<]+)</script>', res_detail.text)
         pinfo = json.loads(play_info.group(1))
     except:
-        raise Exception(f'拉取bvid信息失败，检查：{bvid}')
+        raise Exception(f'解析bvid失败')
 
     title = res_json['data']['title']
-    pdate = res_json['data']['pubdate']
+    pdate = int(time.time())
     pdstr = datetime.fromtimestamp(pdate).strftime("%Y-%m-%d %H:%M:%S")
     desc = res_json['data']['desc']
     cover = res_json['data']['pic']
     duration = res_json['data']['duration']
+    mm, ss = divmod(duration ,60)
+    duration_text = str(int(mm)).zfill(2) + ":" + str(int(ss)).zfill(2)
     uid = res_json['data']['owner']['mid']
     uname = res_json['data']['owner']['name']
     avatar = res_json['data']['owner']['face']
@@ -69,16 +72,60 @@ def get_video_data(bvid):
     is_portrait = 1 if (vwidth / vheight < 1) else 0
     
     return {
-        # 外部导入source：1
         'source': 1,
         'uid': uid,
         'uname': uname,
         'title': title,
-        'bvid': bvid,
+        'vid': bvid,
         'cover': cover,
         'desc': desc,
         'duration': duration,
-        'avatar': avatar, 
+        'duration_text': duration_text,
+        'avatar': avatar,
+        'pdate': pdate, 
+        'pdstr': pdstr,
+        'is_portrait': is_portrait,
+        'max_quality': max_quality,
+        'shazam_id': 0,
+        'dstatus': 0,
+        'dl_retry': 0,
+        'ustatus': 100,
+        'up_retry': 0,
+    }
+
+def parseAC(acid):
+    res_detail = requests.get(ACFUN_VIDEO_PLAY_API(acid), headers={"user-agent": ACFUN_USER_AGENT})
+    try:
+        play_info = re.search(r'window.pageInfo = window.videoInfo = ([^;]+);', res_detail.text)
+        res_json = json.loads(play_info.group(1))
+    except:
+        raise Exception(f'解析acid失败')
+
+    title = res_json['title']
+    pdate = int(time.time())
+    pdstr = datetime.fromtimestamp(pdate).strftime("%Y-%m-%d %H:%M:%S")
+    desc = res_json['description']
+    cover = res_json['coverUrl']
+    duration = res_json['durationMillis'] // 1000
+    mm, ss = divmod(duration ,60)
+    duration_text = str(int(mm)).zfill(2) + ":" + str(int(ss)).zfill(2)
+    uid = res_json['user']['id']
+    uname = res_json['user']['name']
+    avatar = res_json['user']['headUrl']
+    max_quality = res_json['currentVideoInfo']['transcodeInfos'][0]['qualityType'].upper()
+    is_portrait = int(res_json['currentVideoInfo']['sizeType']) - 1
+    
+    return {
+        'source': 3,
+        'uid': uid,
+        'uname': uname,
+        'title': title,
+        'vid': acid,
+        'cover': cover,
+        'desc': desc,
+        'duration': duration,
+        'duration_text': duration_text,
+        'avatar': avatar,
         'pdate': pdate, 
         'pdstr': pdstr,
         'is_portrait': is_portrait,
@@ -155,29 +202,29 @@ def folder_size():
 # 重试下载视频
 @app.route('/api/retry', methods=['POST'])
 def retry_dl_video():
-    bvids = request.json
-    for bvid in bvids:
-        target = g.dynamic_list.get(where('bvid') == bvid)
+    vids = request.json
+    for vid in vids:
+        target = g.dynamic_list.get(where('vid') == vid)
         if target != None:
             find_and_remove(target)
-            g.dynamic_list.update({'dstatus': 0, 'dl_retry': 0, 'ustatus': 100}, where('bvid') == bvid)
+            g.dynamic_list.update({'dstatus': 0, 'dl_retry': 0, 'ustatus': 100}, where('vid') == vid)
     return {'code': 0, 'data': f'重新加入下载列表'}
 
 # 重置BGM识别状态
 @app.route('/api/reset.bgm', methods=['POST'])
 def reset_bgm():
-    bvids = request.json
-    for bvid in bvids:
-        g.dynamic_list.update({'shazam_id': 0}, where('bvid') == bvid)
+    vids = request.json
+    for vid in vids:
+        g.dynamic_list.update({'shazam_id': 0}, where('vid') == vid)
 
     return {'code': 0, 'data': f'重置BGM识别状态'}
 
 # 重置上传状态
 @app.route('/api/reset.upload', methods=['POST'])
 def reset_upload():
-    bvids = request.json
-    for bvid in bvids:
-        g.dynamic_list.update({'ustatus': 100, 'up_retry': 0}, where('bvid') == bvid)
+    vids = request.json
+    for vid in vids:
+        g.dynamic_list.update({'ustatus': 100, 'up_retry': 0}, where('vid') == vid)
 
     return {'code': 0, 'data': f'重置上传状态成功'}
 
@@ -185,12 +232,12 @@ def reset_upload():
 @app.route('/api/edit.title', methods=['POST'])
 def edit_title():
     js = request.json
-    bvid = js['bvid']
+    vid = js['vid']
     shazam_id = js['shazam_id']
     etitle = js['etitle']
     # shazam_id不存在，直接存储
     if shazam_id in [0, -1, -2, -3]:
-        g.dynamic_list.update({'etitle': etitle}, where('bvid') == bvid)
+        g.dynamic_list.update({'etitle': etitle}, where('vid') == vid)
     # shazam_id存在，修改shazam_title
     else:
         g.shazam_list.update({'title': etitle}, where('id') == shazam_id)
@@ -199,9 +246,9 @@ def edit_title():
 # 投稿youtube
 @app.route('/api/upload.ytb', methods=['POST'])
 def upload_ytb():
-    bvids = request.json
-    for bvid in bvids:
-        g.dynamic_list.update({'ustatus': 100}, where('bvid') == bvid)
+    vids = request.json
+    for vid in vids:
+        g.dynamic_list.update({'ustatus': 100}, where('vid') == vid)
     return {'code': 0, 'data': '添加上传任务成功'}
 
 # 删除动态&视频
@@ -210,7 +257,7 @@ def delete_video():
     del_list = request.json
     for item in del_list:
         find_and_remove(item)
-        g.dynamic_list.remove(where('bvid') == item['bvid'])
+        g.dynamic_list.remove(where('vid') == item['vid'])
     return {'code': 0, 'data': '删除投稿成功'}
 
 # 删除该动态之后所有未投稿的视频
@@ -225,16 +272,21 @@ def delete_from(pd, ts):
     g.dynamic_list.remove(q)
     return {'code': 0, 'data': f'共删除 {len(del_list)} 条动态及视频'}
 
-# 外部导入bvid
-@app.route('/api/add.bvid/<bvid>')
-def add_bvid(bvid):
-    if g.dynamic_list.count(where('bvid') == bvid):
-        return {'code': -1, 'data': 'bvid已存在'}
+# 外部导入vid
+@app.route('/api/add.vid/<vid>')
+def add_vid(vid):
+    if g.dynamic_list.count(where('vid') == vid):
+        return {'code': -1, 'data': 'vid已存在'}
     try:
-        item = get_video_data(bvid)
+        if vid[:2] == 'BV':
+            item = parseBV(vid)
+        elif vid[:2] == 'ac':
+            item = parseAC(vid)
+        else:
+            raise Exception('无法解析导入的vid')
         g.dynamic_list.insert(item)
         
-        return {'code': 0, 'data': '导入bvid成功'}
+        return {'code': 0, 'data': '导入vid成功'}
     except Exception as err:
         
         return {'code': -2, 'data': str(err)}
