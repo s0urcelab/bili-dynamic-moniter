@@ -8,7 +8,7 @@ from shazamio import Shazam, Serialize
 
 logger = logging.getLogger('bdm')
     
-async def match():
+async def shazam_match():
     shazam = Shazam()
     
     # 连接数据库

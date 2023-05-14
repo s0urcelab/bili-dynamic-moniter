@@ -19,8 +19,9 @@ def legal_title(*parts: str, join_str: str = '-'):
 """
 from_local  => source: hash 本地手动下载，标题-bvid-hash.mp4
 from_import => source: 1 外部bvid导入，标题.mp4
-none        => source: 0 正常下载，标题.mp4
-none        => source: 2 新下载器，标题-bvid.mp4
+none        => source: 0 bilix下载，标题.mp4
+none        => source: 2 从动态下载，标题-bvid.mp4
+none        => source: 3 外部acid导入，标题-acid.mp4
 """
 def get_mp4_path(item):
     source = item['source']
