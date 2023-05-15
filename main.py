@@ -8,7 +8,7 @@ import asyncio
 import requests
 from datetime import datetime
 from constant import *
-from util import find_and_remove
+from util import find_and_remove, get_mp4_path
 from tinydb import TinyDB, Query, where
 from flask import Flask, g, request
 
@@ -187,14 +187,14 @@ def folder_size():
                     total += get_dir_size(entry.path)
         return round(total / (1024 ** 3), 2)
     
-    dl_count = g.dynamic_list.count(where('dstatus') == 200)
+    wait_count = g.dynamic_list.count(where('ustatus') == 100)
     up_count = g.dynamic_list.count(where('ustatus') == 200)
     
     return {
         'code': 0,
         'data': {
             'size': f'{get_dir_size()}GB',
-            'downloaded': dl_count,
+            'waiting': wait_count,
             'uploaded': up_count,
         }
     }
@@ -289,6 +289,18 @@ def add_vid(vid):
         return {'code': 0, 'data': '导入vid成功'}
     except Exception as err:
         
+        return {'code': -2, 'data': str(err)}
+    
+@app.route('/api/find.local', methods=['POST'])
+def find_local():
+    item = request.json
+    try:
+        local = get_mp4_path(item)
+        if local:
+            linux_path = local[0]
+            windows_path = linux_path.replace('/media/', '')
+            return {'code': 0, 'data': windows_path}
+    except Exception as err:
         return {'code': -2, 'data': str(err)}
 
 if __name__ == '__main__':
