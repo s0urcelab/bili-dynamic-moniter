@@ -40,7 +40,7 @@ def get_cover_path(item):
     else:
         key = item['vid'] if (source in [2, 3]) else item['source']
         result = []
-        for ext in ('.jpg', '.png'):
+        for ext in ('.jpg', '.png', '.jpeg', '.gif'):
             files = glob.glob(os.path.join(MEDIA_ROOT, f'*{key}*{ext}'))
             result.extend(files)
         return result
