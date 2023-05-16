@@ -41,42 +41,49 @@ def add_shazam(item):
     else:
         return item
 
-def parseBV(bvid):
+def parseBV(bvid, p = 1):
     cookie = {'SESSDATA': DYNAMIC_COOKIE}
     res_view = requests.get(VIDEO_VIEW_API(bvid), cookies=cookie)
     res_json = json.loads(res_view.text)
     if res_json['code'] != 0:
         raise Exception(f'解析bvid失败')
 
-    res_detail = requests.get(VIDEO_DETAIL_API(bvid))
+    res_detail = requests.get(VIDEO_DETAIL_API(bvid, p))
     try:
         play_info = re.search(r'<script>window.__playinfo__=([^<]+)</script>', res_detail.text)
         pinfo = json.loads(play_info.group(1))
     except:
         raise Exception(f'解析bvid失败')
 
+    curr_page = res_json['data']['pages'][p - 1]
     title = res_json['data']['title']
     pdate = int(time.time())
     pdstr = datetime.fromtimestamp(pdate).strftime("%Y-%m-%d %H:%M:%S")
     desc = res_json['data']['desc']
     cover = res_json['data']['pic']
-    duration = res_json['data']['duration']
-    mm, ss = divmod(duration ,60)
+    cid = curr_page['cid']
+    p_title = curr_page['part']
+    duration = curr_page['duration']
+    mm, ss = divmod(duration, 60)
     duration_text = str(int(mm)).zfill(2) + ":" + str(int(ss)).zfill(2)
     uid = res_json['data']['owner']['mid']
     uname = res_json['data']['owner']['name']
     avatar = res_json['data']['owner']['face']
     max_quality = pinfo['data']['accept_description'][0]
-    vwidth = pinfo['data']['dash']['video'][0]['width']
-    vheight = pinfo['data']['dash']['video'][0]['height']
+    vwidth = curr_page['dimension']['width']
+    vheight = curr_page['dimension']['height']
     is_portrait = 1 if (vwidth / vheight < 1) else 0
     
     return {
         'source': 1,
+        'pure_vid': bvid,
+        'vid': f'{bvid}[p{p}]' if p > 1 else bvid,
+        'p': p,
+        'cid': cid,
+        'p_title': p_title,
         'uid': uid,
         'uname': uname,
         'title': title,
-        'vid': bvid,
         'cover': cover,
         'desc': desc,
         'duration': duration,
@@ -93,20 +100,21 @@ def parseBV(bvid):
         'up_retry': 0,
     }
 
-def parseAC(acid):
-    res_detail = requests.get(ACFUN_VIDEO_PLAY_API(acid), headers={"user-agent": ACFUN_USER_AGENT})
+def parseAC(acid, p = 1):
+    res_detail = requests.get(ACFUN_VIDEO_PLAY_API(acid, p), headers={"user-agent": ACFUN_USER_AGENT})
     try:
         play_info = re.search(r'window.pageInfo = window.videoInfo = ([^;]+);', res_detail.text)
         res_json = json.loads(play_info.group(1))
     except:
         raise Exception(f'解析acid失败')
 
+    p_title = res_json['videoList'][p - 1]['title']
     title = res_json['title']
     pdate = int(time.time())
     pdstr = datetime.fromtimestamp(pdate).strftime("%Y-%m-%d %H:%M:%S")
     desc = res_json['description']
     cover = res_json['coverUrl']
-    duration = res_json['durationMillis'] // 1000
+    duration = res_json['videoList'][p - 1]['durationMillis'] // 1000
     mm, ss = divmod(duration ,60)
     duration_text = str(int(mm)).zfill(2) + ":" + str(int(ss)).zfill(2)
     uid = res_json['user']['id']
@@ -117,10 +125,13 @@ def parseAC(acid):
     
     return {
         'source': 3,
+        'pure_vid': acid,
+        'vid': f'{acid}[p{p}]' if p > 1 else acid,
+        'p': p,
+        'p_title': p_title,
         'uid': uid,
         'uname': uname,
         'title': title,
-        'vid': acid,
         'cover': cover,
         'desc': desc,
         'duration': duration,
@@ -273,20 +284,24 @@ def delete_from(pd, ts):
     return {'code': 0, 'data': f'共删除 {len(del_list)} 条动态及视频'}
 
 # 外部导入vid
-@app.route('/api/add.vid/<vid>')
-def add_vid(vid):
-    if g.dynamic_list.count(where('vid') == vid):
-        return {'code': -1, 'data': 'vid已存在'}
+@app.route('/api/add.vid', methods=['POST'])
+def add_vid():
+    tp = request.json['type']
+    vid = request.json['vid']
+    p = int(request.json['p'])
+    q_same = (where('vid') == vid) & (where('p') == p)
+    if g.dynamic_list.count(q_same):
+        return {'code': -1, 'data': '稿件已存在'}
     try:
-        if vid[:2] == 'BV':
-            item = parseBV(vid)
-        elif vid[:2] == 'ac':
-            item = parseAC(vid)
+        if tp == 'bilibili':
+            item = parseBV(vid, p)
+        elif tp == 'acfun':
+            item = parseAC(vid, p)
         else:
             raise Exception('无法解析导入的vid')
         g.dynamic_list.insert(item)
         
-        return {'code': 0, 'data': '导入vid成功'}
+        return {'code': 0, 'data': '导入稿件成功'}
     except Exception as err:
         
         return {'code': -2, 'data': str(err)}

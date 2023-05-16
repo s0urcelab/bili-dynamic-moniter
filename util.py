@@ -18,35 +18,43 @@ def legal_title(*parts: str, join_str: str = '-'):
 
 """
 from_local  => source: hash 本地手动下载，标题-bvid-hash.mp4
-from_import => source: 1 外部bvid导入，标题.mp4
 none        => source: 0 bilix下载，标题.mp4
-none        => source: 2 从动态下载，标题-bvid.mp4
-none        => source: 3 外部acid导入，标题-acid.mp4
+from_import => source: 1 外部bvid导入，标题-vid.mp4
+none        => source: 2 从动态下载，标题-vid.mp4
+none        => source: 3 外部acid导入，标题-vid.mp4
 """
 def get_mp4_path(item):
+    vid = item['vid']
     source = item['source']
     title = glob.escape(legal_title(item['title'][:30]))
-    if source in [0, 1]:
+    
+    if source in [0]:
         return glob.glob(os.path.join(MEDIA_ROOT, f'{title}*.mp4'))
+    elif source in [1, 2, 3]:
+        return glob.glob(os.path.join(MEDIA_ROOT, f'*-{glob.escape(vid)}.mp4'))
     else:
-        key = item['vid'] if (source in [2, 3]) else item['source']
-        return glob.glob(os.path.join(MEDIA_ROOT, f'*{key}*.mp4'))
+        return glob.glob(os.path.join(MEDIA_ROOT, f'*{source}*.mp4'))
 
 def get_cover_path(item):
+    vid = item['vid']
     source = item['source']
     title = glob.escape(legal_title(item['title'][:30]))
-    if source in [0, 1]:
+    
+    if source in [0]:
         return glob.glob(os.path.join(MEDIA_ROOT, f'{title}*.jpg'))
-    else:
-        key = item['vid'] if (source in [2, 3]) else item['source']
+    elif source in [1, 2, 3]:
         result = []
         for ext in ('.jpg', '.png', '.jpeg', '.gif'):
-            files = glob.glob(os.path.join(MEDIA_ROOT, f'*{key}*{ext}'))
+            files = glob.glob(os.path.join(MEDIA_ROOT, f'*-{glob.escape(vid)}{ext}'))
             result.extend(files)
         return result
+    else:
+        return glob.glob(os.path.join(MEDIA_ROOT, f'*{source}*.png'))
 
-def get_frag_path(vid):
-    return glob.glob(os.path.join(MEDIA_ROOT, f'*-{vid}*'))
+def get_frag_path(item):
+    vid = item['vid']
+    
+    return glob.glob(os.path.join(MEDIA_ROOT, f'*-{glob.escape(vid)}.f[0-9]*'))
 
 def get_video_resolution(filename):
     cmd = ['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height,bit_rate,r_frame_rate', '-of', 'json']
@@ -63,11 +71,16 @@ def get_video_resolution(filename):
 
 # 查找本地文件并删除
 def find_and_remove(item):
-    for i in get_frag_path(item['vid']):
+    for i in get_frag_path(item):
         os.remove(i)
     for i in get_mp4_path(item):
         os.remove(i)
     for i in get_cover_path(item):
         os.remove(i)
 
-    
+def get_dl_url(item):
+    vid = item['pure_vid'] if ('pure_vid' in item) else item['vid']
+    item_p = item['p'] if ('p' in item) else 1
+    item_src = item['source']
+    API = ACFUN_VIDEO_PLAY_API if (item_src == 3) else VIDEO_DETAIL_API
+    return API(vid, item_p)

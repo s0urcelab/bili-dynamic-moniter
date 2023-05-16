@@ -2,7 +2,7 @@
 import os
 import logging
 from constant import *
-from util import get_mp4_path, get_video_resolution, find_and_remove, legal_title
+from util import get_mp4_path, get_video_resolution, find_and_remove, legal_title, get_dl_url
 from tinydb import TinyDB, Query, where
 from tinydb.operations import increment
 from yt_dlp import YoutubeDL
@@ -33,7 +33,7 @@ def download():
         # 下载
         def download_video(item):
             item_vid = item['vid']
-            item_src = item['source']
+            item_p = item['p'] if ('p' in item) else 1
             item_title = item['title']
             item_max_quality = item['max_quality']
             item_retry_count = item['dl_retry']
@@ -59,7 +59,7 @@ def download():
             switch_dl_status(item_vid, 100)
             try:
                 with YoutubeDL(ydl_opts) as ydl:
-                    url = ACFUN_VIDEO_PLAY_API(item_vid) if (item_src == 3) else VIDEO_DETAIL_API(item_vid)
+                    url = get_dl_url(item)
                     ydl.download([url])
 
                 mp4_files = get_mp4_path(item)

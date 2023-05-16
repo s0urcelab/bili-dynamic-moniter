@@ -128,12 +128,12 @@ def update():
             seen = set()
             dupes = []
             for item in full_list:
-                bvid = item['vid']
+                vid = item['vid']
                 doc_id = item.doc_id
-                if bvid in seen:
+                if vid in seen:
                     dupes.append(doc_id)
                 else:
-                    seen.add(bvid)
+                    seen.add(vid)
             dynamic_list.remove(doc_ids=dupes)
             return len(dupes)
 
