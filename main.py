@@ -289,8 +289,9 @@ def add_vid():
     tp = request.json['type']
     vid = request.json['vid']
     p = int(request.json['p'])
-    q_same = (where('vid') == vid) & (where('p') == p)
-    if g.dynamic_list.count(q_same):
+    if p > 1:
+        vid = f'{vid}[p{p}]'
+    if g.dynamic_list.count(where('vid') == vid):
         return {'code': -1, 'data': '稿件已存在'}
     try:
         if tp == 'bilibili':
