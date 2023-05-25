@@ -218,7 +218,7 @@ def retry_dl_video():
         target = g.dynamic_list.get(where('vid') == vid)
         if target != None:
             find_and_remove(target)
-            g.dynamic_list.update({'dstatus': 0, 'dl_retry': 0, 'ustatus': 100}, where('vid') == vid)
+            g.dynamic_list.update({'dstatus': 0, 'dl_retry': 0}, where('vid') == vid)
     return {'code': 0, 'data': f'重新加入下载列表'}
 
 # 重置BGM识别状态
