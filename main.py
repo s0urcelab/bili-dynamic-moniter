@@ -24,6 +24,7 @@ def before_request():
     g.shazam_list = db.table('shazam_list')
     g.dynamic_list = db.table('dynamic_list')
     g.config = db.table('config')
+    g.history = db.table('history')
 
 @app.after_request
 def after_request(response):
@@ -291,6 +292,9 @@ def add_vid():
     p = int(request.json['p'])
     if p > 1:
         vid = f'{vid}[p{p}]'
+        
+    if g.history.count(where('vid') == vid):
+        return {'code': -1, 'data': '稿件已存在'}
     if g.dynamic_list.count(where('vid') == vid):
         return {'code': -1, 'data': '稿件已存在'}
     try:
