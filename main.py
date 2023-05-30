@@ -104,7 +104,7 @@ def parseBV(bvid, p = 1):
 def parseAC(acid, p = 1):
     res_detail = requests.get(ACFUN_VIDEO_PLAY_API(acid, p), headers={"user-agent": ACFUN_USER_AGENT})
     try:
-        play_info = re.search(r'window.pageInfo = window.videoInfo = ([^;]+);', res_detail.text)
+        play_info = re.search(r"window\.pageInfo\s*=\s*window\.videoInfo\s*=\s*(\{(?:(?<!\};).)*\});", res_detail.text)
         res_json = json.loads(play_info.group(1))
     except:
         raise Exception(f'解析acid失败')
