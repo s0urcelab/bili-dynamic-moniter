@@ -50,15 +50,17 @@ def update():
                 is_portrait = 1 if (vwidth / vheight < 1) else 0
                 duration = pinfo['data']['timelength']
             except:
-                logger.info(f'获取 {bvid} 视频详情失败')
+                logger.error(f'获取 {bvid} 视频详情失败')
+                # 直接失败处理
+                return {'dstatus': -9}
                 
-                # 字符串反算视频时长
-                d_arr = duration_text.split(':')
-                if len(d_arr) == 2:
-                    duration = (int(d_arr[0]) * 60 + int(d_arr[1])) * 1000
-                if len(d_arr) == 3:
-                    duration = (int(d_arr[0]) * 3600 + int(d_arr[1]) * 60 + int(d_arr[2])) * 1000
-                return {'duration': duration}
+                # # 字符串反算视频时长
+                # d_arr = duration_text.split(':')
+                # if len(d_arr) == 2:
+                #     duration = (int(d_arr[0]) * 60 + int(d_arr[1])) * 1000
+                # if len(d_arr) == 3:
+                #     duration = (int(d_arr[0]) * 3600 + int(d_arr[1]) * 60 + int(d_arr[2])) * 1000
+                # return {'duration': duration}
             else:
                 return {'max_quality': max_quality, 'is_portrait': is_portrait, 'duration': duration}
 

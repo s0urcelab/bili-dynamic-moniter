@@ -288,10 +288,9 @@ def delete_from(pd, ts):
 @app.route('/api/add.vid', methods=['POST'])
 def add_vid():
     tp = request.json['type']
-    vid = request.json['vid']
+    pure_vid = request.json['vid']
     p = int(request.json['p'])
-    if p > 1:
-        vid = f'{vid}[p{p}]'
+    vid = f'{pure_vid}[p{p}]' if p > 1 else pure_vid
         
     if g.history.count(where('vid') == vid):
         return {'code': -1, 'data': '稿件已存在'}
@@ -299,9 +298,9 @@ def add_vid():
         return {'code': -1, 'data': '稿件已存在'}
     try:
         if tp == 'bilibili':
-            item = parseBV(vid, p)
+            item = parseBV(pure_vid, p)
         elif tp == 'acfun':
-            item = parseAC(vid, p)
+            item = parseAC(pure_vid, p)
         else:
             raise Exception('无法解析导入的vid')
         g.dynamic_list.insert(item)
