@@ -9,6 +9,7 @@ DL_COOKIE_FILE = os.environ['DL_COOKIE_FILE']
 MEDIA_ROOT = os.environ['MEDIA_ROOT']
 MAX_DYNAMIC_FETCH_PAGE = int(os.environ['MAX_DYNAMIC_FETCH_PAGE'])
 CONCURRENT_TASK_NUM = int(os.environ['CONCURRENT_TASK_NUM'])
+MONGODB_URL = os.environ['MONGODB_URL']
 
 USER_DYNAMIC_API = lambda page,offset: f'https://api.bilibili.com/x/polymer/web-dynamic/v1/feed/all?timezone_offset=-480&type=video&page={page}&features=itemOpusStyle&offset={offset}'
 USER_FOLLOW_API = lambda page: f'https://api.bilibili.com/x/relation/tag?mid=543741&tagid=37444368&pn={page}&ps=20'

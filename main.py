@@ -19,7 +19,7 @@ def before_request():
     在请求处理函数之前打开数据库连接
     """
     
-    client = MongoClient("mongodb://host.docker.internal:27017/")
+    client = MongoClient(MONGODB_URL)
     g.client = client
     g.dynamic_list = client.dance.dynamic_list
     g.config = client.dance.config
@@ -166,9 +166,37 @@ def init_cpdate(datestring):
     g.config.update_one({"check_point": {"$exists": True}}, {"$set": {"check_point": cpdate}}, upsert=True)
     return {'code': 0, 'data': f'动态截止日期初始化为：{datestring}'}
 
+# 探索列表
+@app.route('/api/exp.list')
+def explore_list():
+    page = int(request.args.get('page') or 1)
+    size = int(request.args.get('size') or 15)
+    uid = int(request.args.get('uid') or 0)
+    
+    q1 = {"ustatus": {"$gt": 0}}
+    q2 = {"$and": [{"uid": uid}, {"ustatus": {"$gt": 0}}]}
+    q = q1 if uid == 0 else q2
+    total = g.dynamic_list.count_documents(q)
+    clist = g.dynamic_list.find(q, {"_id": 0}).sort([("pdate", -1)]).limit(size).skip((page - 1) * size)
+
+    return {'code': 0, 'data': list(map(add_attach, clist)), 'total': total }
+
+# 视频详情
+@app.route('/api/video.detail/<vid>')
+def video_detail(vid):
+    detail = g.dynamic_list.find_one({"vid": vid}, {"_id": 0})
+    try:
+        local = get_mp4_path(detail)
+        if local:
+            linux_path = local[0]
+            filesrc = linux_path.replace('/media/', 'https://bdm.src.moe:8000/file/')
+            return {'code': 0, 'data': {**detail, 'filesrc': filesrc}}
+    except Exception as err:
+        return {'code': -2, 'data': str(err)}
+
 # 动态列表
-@app.route('/api/list')
-def dynamic_list_api():
+@app.route('/api/dyn.list')
+def dyn_list():
     page = int(request.args.get('page') or 1)
     size = int(request.args.get('size') or 50)
     # 0全部，1下载失败，2上传ytb失败
