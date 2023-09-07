@@ -3,6 +3,7 @@ import asyncio
 import subprocess
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
+from pymongo import MongoClient
 from update import update
 from match import shazam_match
 from download import download
@@ -13,9 +14,13 @@ logging.basicConfig(format=formatter, datefmt='%Y-%m-%d %H:%M:%S', level=logging
 logger = logging.getLogger('bdm')
 
 async def main():
-    update()
-    download()
-    await shazam_match()
+    client = MongoClient("mongodb://host.docker.internal:27017/")
+    
+    update(client)
+    download(client)
+    await shazam_match(client)
+    
+    client.close()
 
 if __name__ == '__main__':
     scheduler = AsyncIOScheduler(timezone='Asia/Shanghai')

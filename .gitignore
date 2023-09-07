@@ -1,7 +1,6 @@
 /__pycache__
 .env
-db.json
-db.json.bak
+/db
+/scripts
 /static
-demo.py
 cookies.txt

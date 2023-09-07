@@ -4,13 +4,12 @@ import os
 import re
 import json
 import time
-import asyncio
 import requests
 from datetime import datetime
 from constant import *
 from util import find_and_remove, get_mp4_path
-from tinydb import TinyDB, Query, where
 from flask import Flask, g, request
+from pymongo import MongoClient
 
 app = Flask(__name__)
 
@@ -19,28 +18,33 @@ def before_request():
     """
     在请求处理函数之前打开数据库连接
     """
-    db = TinyDB(DB_PATH)
-    g.db = db
-    g.shazam_list = db.table('shazam_list')
-    g.dynamic_list = db.table('dynamic_list')
-    g.config = db.table('config')
-    g.history = db.table('history')
+    
+    client = MongoClient("mongodb://host.docker.internal:27017/")
+    g.client = client
+    g.dynamic_list = client.dance.dynamic_list
+    g.config = client.dance.config
+    g.shazam_list = client.dance.shazam_list
+    g.follow_list = client.dance.follow_list
 
 @app.after_request
 def after_request(response):
     """
     在请求处理函数之后关闭数据库连接
     """
-    g.db.close()
+    g.client.close()
     return response
 
-def add_shazam(item):
-    q = where('id') == item['shazam_id']
-    target = g.shazam_list.get(q)
-    if target != None:
-        return {**item, 'etitle': target['title']}
-    else:
-        return item
+def add_attach(item):
+    ritem = item
+    # shazam
+    st = g.shazam_list.find_one({"id": item['shazam_id']})
+    # uname
+    ut = g.follow_list.find_one({"uid": item['uid']})
+    if st != None:
+        ritem = {**ritem, 'etitle': st['title']}
+    if ut != None:
+        ritem = {**ritem, 'uname': ut['uname']}
+    return ritem
 
 def parseBV(bvid, p = 1):
     cookie = {'SESSDATA': DYNAMIC_COOKIE}
@@ -159,7 +163,7 @@ def catch_all(path):
 @app.route('/api/init/<datestring>')
 def init_cpdate(datestring):
     cpdate = int(datetime.strptime(datestring, "%Y-%m-%d %H:%M:%S").timestamp())
-    g.config.upsert({'check_point': cpdate}, where('check_point').exists())
+    g.config.update_one({"check_point": {"$exists": True}}, {"$set": {"check_point": cpdate}}, upsert=True)
     return {'code': 0, 'data': f'动态截止日期初始化为：{datestring}'}
 
 # 动态列表
@@ -170,21 +174,21 @@ def dynamic_list_api():
     # 0全部，1下载失败，2上传ytb失败
     dtype = int(request.args.get('dtype') or 0)
     # 所有失败类型
-    dl_err_q = where('dstatus') < 0
-    up_err_q = where('ustatus') < 0
+    # dl_err_q = where('dstatus') < 0
+    # up_err_q = where('ustatus') < 0
     if dtype == 1:
-        q_list = g.dynamic_list.search(dl_err_q)
+        q = {"dstatus": {"$lt": 0}}
     elif dtype == 2:
-        q_list = g.dynamic_list.search(up_err_q)
+        q = {"ustatus": {"$lt": 0}}
     else:
-        q_list = g.dynamic_list.all()
-    all_list = sorted(q_list, key=lambda i: i['pdate'], reverse=True)
-    total = len(all_list)
-    st = (page - 1) * size
-    ed = page * size
-    current_list = all_list[st:ed]
-    
-    return {'code': 0, 'data': list(map(add_shazam, current_list)), 'total': total }
+        q = {}
+    # all_list = sorted(q_list, key=lambda i: i['pdate'], reverse=True)
+    total = g.dynamic_list.count_documents(q)
+    # st = (page - 1) * size
+    # ed = page * size
+    current_list = g.dynamic_list.find(q, {"_id": 0}).sort([("pdate", -1)]).limit(size).skip((page - 1) * size)
+
+    return {'code': 0, 'data': list(map(add_attach, current_list)), 'total': total }
 
 # 占用空间情况
 @app.route('/api/folder.size')
@@ -199,8 +203,8 @@ def folder_size():
                     total += get_dir_size(entry.path)
         return round(total / (1024 ** 3), 2)
     
-    wait_count = g.dynamic_list.count(where('ustatus') == 100)
-    up_count = g.dynamic_list.count(where('ustatus') == 200)
+    wait_count = g.dynamic_list.count_documents({"ustatus": 100})
+    up_count = g.dynamic_list.count_documents({"ustatus": 200})
     
     return {
         'code': 0,
@@ -216,10 +220,10 @@ def folder_size():
 def retry_dl_video():
     vids = request.json
     for vid in vids:
-        target = g.dynamic_list.get(where('vid') == vid)
+        target = g.dynamic_list.find_one({"vid": vid})
         if target != None:
             find_and_remove(target)
-            g.dynamic_list.update({'dstatus': 0, 'dl_retry': 0}, where('vid') == vid)
+            g.dynamic_list.update_one({"vid": vid}, {"$set": {"dstatus": 0, "dl_retry": 0}})
     return {'code': 0, 'data': f'重新加入下载列表'}
 
 # 重置BGM识别状态
@@ -227,7 +231,7 @@ def retry_dl_video():
 def reset_bgm():
     vids = request.json
     for vid in vids:
-        g.dynamic_list.update({'shazam_id': 0}, where('vid') == vid)
+        g.dynamic_list.update_one({"vid": vid}, {"$set": {"shazam_id": 0}})
 
     return {'code': 0, 'data': f'重置BGM识别状态'}
 
@@ -236,7 +240,7 @@ def reset_bgm():
 def reset_upload():
     vids = request.json
     for vid in vids:
-        g.dynamic_list.update({'ustatus': 100, 'up_retry': 0}, where('vid') == vid)
+        g.dynamic_list.update_one({"vid": vid}, {"$set": {"ustatus": 100, "up_retry": 0}})
 
     return {'code': 0, 'data': f'重置上传状态成功'}
 
@@ -249,10 +253,10 @@ def edit_title():
     etitle = js['etitle']
     # shazam_id不存在，直接存储
     if shazam_id in [0, -1, -2, -3]:
-        g.dynamic_list.update({'etitle': etitle}, where('vid') == vid)
+        g.dynamic_list.update_one({"vid": vid}, {"$set": {"etitle": etitle}})
     # shazam_id存在，修改shazam_title
     else:
-        g.shazam_list.update({'title': etitle}, where('id') == shazam_id)
+        g.shazam_list.update_one({"id": shazam_id}, {"$set": {"title": etitle}})
     return {'code': 0, 'data': '修改自定义标题成功'}
 
 # 投稿youtube
@@ -260,7 +264,7 @@ def edit_title():
 def upload_ytb():
     vids = request.json
     for vid in vids:
-        g.dynamic_list.update({'ustatus': 100}, where('vid') == vid)
+        g.dynamic_list.update_one({"vid": vid}, {"$set": {"ustatus": 100}})
     return {'code': 0, 'data': '添加上传任务成功'}
 
 # 删除动态&视频
@@ -269,7 +273,7 @@ def delete_video():
     del_list = request.json
     for item in del_list:
         find_and_remove(item)
-        g.dynamic_list.remove(where('vid') == item['vid'])
+        g.dynamic_list.delete_one({"vid": item['vid']})
     return {'code': 0, 'data': '删除投稿成功'}
 
 # 删除该动态之后所有未投稿的视频
@@ -277,11 +281,12 @@ def delete_video():
 def delete_from(pd, ts):
     pdate = int(pd)
     timestamp = int(ts)
-    q = (where('pdate') >= pdate) & (where('pdate') <= timestamp) & (where('ustatus') == 0)
-    del_list = g.dynamic_list.search(q)
+    q = {"$and": [{"ustatus": 0}, {"pdate": {"$lte": timestamp}}, {"pdate": {"$gte": pdate}}]}
+    # q = (where('pdate') >= pdate) & (where('pdate') <= timestamp) & (where('ustatus') == 0)
+    del_list = g.dynamic_list.find(q)
     for item in del_list:
         find_and_remove(item)
-    g.dynamic_list.remove(q)
+    g.dynamic_list.delete_one(q)
     return {'code': 0, 'data': f'共删除 {len(del_list)} 条动态及视频'}
 
 # 外部导入vid
@@ -292,9 +297,9 @@ def add_vid():
     p = int(request.json['p'])
     vid = f'{pure_vid}[p{p}]' if p > 1 else pure_vid
         
-    if g.history.count(where('vid') == vid):
-        return {'code': -1, 'data': '稿件已存在'}
-    if g.dynamic_list.count(where('vid') == vid):
+    # if g.history.count(where('vid') == vid):
+    #     return {'code': -1, 'data': '稿件已存在'}
+    if g.dynamic_list.count_documents({"vid": vid}):
         return {'code': -1, 'data': '稿件已存在'}
     try:
         if tp == 'bilibili':
@@ -303,7 +308,7 @@ def add_vid():
             item = parseAC(pure_vid, p)
         else:
             raise Exception('无法解析导入的vid')
-        g.dynamic_list.insert(item)
+        g.dynamic_list.insert_one(item)
         
         return {'code': 0, 'data': '导入稿件成功'}
     except Exception as err:
