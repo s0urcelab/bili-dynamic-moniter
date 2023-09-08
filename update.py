@@ -11,7 +11,7 @@ logger = logging.getLogger('bdm')
 def update(client):
     dynamic_list = client.dance.dynamic_list
     config = client.dance.config
-    follow_list = client.dance.follow_list
+    up_list = client.dance.up_list
 
     def fetch_follow(page): 
         cookie = {'SESSDATA': DYNAMIC_COOKIE}
@@ -106,41 +106,29 @@ def update(client):
             flist.extend(page_list)
             page = page + 1
 
-        uid_set = set(map(lambda i:  i['mid'], flist))
+        follow_list = list(map(lambda i:  i['mid'], flist))
         user_list = list(map(lambda i: {"uid": i['mid'], "uname": i['uname'], "avatar": i['face'], "sign": i['sign']}, flist))
         # 存入数据库
+        config.update_one({"follow_list": {"$exists": True}}, {"$set": {"follow_list": follow_list}}, upsert=True)
         try:
-            follow_list.insert_many(user_list, ordered=False)
+            up_list.insert_many(user_list, ordered=False)
         except:
-            logger.info(f'忽略重复的关注用户')
-        all_users = follow_list.find({}, {"_id": 0})
-        for user in all_users:
-            if user['uid'] not in uid_set:
-                follow_list.delete_one({"uid": user['uid']})
-        total_user = follow_list.count_documents({})
-        logger.info(f'关注分组已更新，当前共关注 {total_user} 用户')
-        return uid_set
-
-    # def remove_duplicated_dynamic():
-    #     full_list = dynamic_list.find()
-    #     seen = set()
-    #     dupes = []
-    #     for item in full_list:
-    #         vid = item['vid']
-    #         doc_id = item.doc_id
-    #         if vid in seen:
-    #             dupes.append(doc_id)
-    #         else:
-    #             seen.add(vid)
-    #     dynamic_list.remove(doc_ids=dupes)
-    #     return len(dupes)
+            pass
+            # logger.info(f'忽略重复的关注用户')
+        # all_users = up_list.find({}, {"_id": 0})
+        # for user in all_users:
+        #     if user['uid'] not in uid_set:
+        #         up_list.delete_one({"uid": user['uid']})
+        # total_user = up_list.count_documents({})
+        logger.info(f'关注分组已更新，当前共关注 {len(follow_list)} 用户')
+        return follow_list
 
     """
-    获取截止时间 check_point 前的所有关注用户 uid_set 的动态
+    获取截止时间 check_point 前的所有关注用户 follow_list 的动态
     """
     logger.info('定时任务：获取最新动态')
     cpdate = config.find_one({"check_point": {"$exists": True}})['check_point']
-    uid_set = refresh_follow()
+    follow_list = refresh_follow()
     flist = []
     page = 1
     offset = ''
@@ -159,7 +147,7 @@ def update(client):
         page = page + 1
         offset = single_part['offset']
 
-    filter_list = list(filter(lambda i: i['uid'] in uid_set, flist))
+    filter_list = list(filter(lambda i: i['uid'] in follow_list, flist))
 
     add_vinfo = lambda item: {**item, **fetch_detail(item)}
     d = [add_vinfo(v) for v in filter_list]

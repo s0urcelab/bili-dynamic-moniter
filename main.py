@@ -24,7 +24,7 @@ def before_request():
     g.dynamic_list = client.dance.dynamic_list
     g.config = client.dance.config
     g.shazam_list = client.dance.shazam_list
-    g.follow_list = client.dance.follow_list
+    g.up_list = client.dance.up_list
 
 @app.after_request
 def after_request(response):
@@ -39,11 +39,11 @@ def add_attach(item):
     # shazam
     st = g.shazam_list.find_one({"id": item['shazam_id']})
     # uname
-    ut = g.follow_list.find_one({"uid": item['uid']})
+    ut = g.up_list.find_one({"uid": item['uid']})
     if st != None:
         ritem = {**ritem, 'etitle': st['title']}
     if ut != None:
-        ritem = {**ritem, 'uname': ut['uname']}
+        ritem = {**ritem, 'uname': ut['uname'], 'usign': ut['sign'], 'avatar': ut['avatar']}
     return ritem
 
 def parseBV(bvid, p = 1):
@@ -122,7 +122,7 @@ def parseAC(acid, p = 1):
     duration = res_json['videoList'][p - 1]['durationMillis'] // 1000
     mm, ss = divmod(duration ,60)
     duration_text = str(int(mm)).zfill(2) + ":" + str(int(ss)).zfill(2)
-    uid = res_json['user']['id']
+    uid = int(res_json['user']['id'])
     uname = res_json['user']['name']
     avatar = res_json['user']['headUrl']
     max_quality = res_json['currentVideoInfo']['transcodeInfos'][0]['qualityType'].upper()
@@ -185,14 +185,47 @@ def explore_list():
 @app.route('/api/video.detail/<vid>')
 def video_detail(vid):
     detail = g.dynamic_list.find_one({"vid": vid}, {"_id": 0})
+    uid = detail['uid']
+    q = {"$and": [{"uid": uid}, {"vid": { "$ne": vid }}, {"ustatus": {"$gt": 0}}]}
+    more_list = g.dynamic_list.find(q, {"_id": 0}).limit(6)
     try:
         local = get_mp4_path(detail)
         if local:
             linux_path = local[0]
             filesrc = linux_path.replace('/media/', 'https://bdm.src.moe:8000/file/')
-            return {'code': 0, 'data': {**detail, 'filesrc': filesrc}}
+            return {'code': 0, 'data': {**add_attach(detail), 'filesrc': filesrc}, 'more': list(more_list)}
     except Exception as err:
         return {'code': -2, 'data': str(err)}
+
+# 查询
+@app.route('/api/fuzzy.search')
+def fuzzy_search():
+    keyword = request.args.get('keyword')
+    
+    if not keyword:
+        return {'code': -5, 'data': '未传入关键词'}
+    
+    regex = f'.*{keyword}.*'
+    qre = {'$regex': regex, '$options': 'i'}
+    u_res = g.up_list.find({'uname': qre}, {'_id': 0})
+    sz_list = list(map(lambda i: i['id'], g.shazam_list.find({'title': qre}, {'_id': 0})))
+    dq = {"$and": [{"ustatus": {"$gt": 0}}, {'$or': [{'shazam_id': {'$in': sz_list}}, {'title': qre}, {'etitle': qre}]}]}
+    d_res = g.dynamic_list.find(dq, {'_id': 0})
+    
+    return {'code': 0, 'data': { 'ups': list(u_res), 'videos': list(map(add_attach, d_res))[:50] }}
+
+# # 排行榜
+# @app.route('/api/rank.list')
+# def rank_list():
+#     detail = g.dynamic_list.find_one({"vid": vid}, {"_id": 0})
+#     try:
+#         local = get_mp4_path(detail)
+#         if local:
+#             linux_path = local[0]
+#             filesrc = linux_path.replace('/media/', 'https://bdm.src.moe:8000/file/')
+#             return {'code': 0, 'data': {**add_attach(detail), 'filesrc': filesrc}}
+#     except Exception as err:
+#         return {'code': -2, 'data': str(err)}
 
 # 动态列表
 @app.route('/api/dyn.list')
