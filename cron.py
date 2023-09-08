@@ -7,6 +7,7 @@ from pymongo import MongoClient
 from update import update
 from match import shazam_match
 from download import download
+from constant import *
 
 # 配置logger
 formatter = '%(asctime)s %(levelname)s %(message)s'
@@ -14,7 +15,7 @@ logging.basicConfig(format=formatter, datefmt='%Y-%m-%d %H:%M:%S', level=logging
 logger = logging.getLogger('bdm')
 
 async def main():
-    client = MongoClient("mongodb://host.docker.internal:27017/")
+    client = MongoClient(MONGODB_URL)
     
     update(client)
     download(client)

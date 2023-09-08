@@ -107,7 +107,7 @@ def update(client):
             page = page + 1
 
         uid_set = set(map(lambda i:  i['mid'], flist))
-        user_list = list(map(lambda i: {"uid": i['mid'], "uname": i['uname']}, flist))
+        user_list = list(map(lambda i: {"uid": i['mid'], "uname": i['uname'], "avatar": i['face'], "sign": i['sign']}, flist))
         # 存入数据库
         try:
             follow_list.insert_many(user_list, ordered=False)
