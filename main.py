@@ -173,8 +173,8 @@ def explore_list():
     size = int(request.args.get('size') or 15)
     uid = int(request.args.get('uid') or 0)
     
-    q1 = {"ustatus": {"$gt": 0}}
-    q2 = {"$and": [{"uid": uid}, {"ustatus": {"$gt": 0}}]}
+    q1 = {"$and": [{"ustatus": {"$gt": 0}}, {"dstatus": 200}]}
+    q2 = {"$and": [{"uid": uid}, {"ustatus": {"$gt": 0}}, {"dstatus": 200}]}
     q = q1 if uid == 0 else q2
     total = g.dynamic_list.count_documents(q)
     clist = g.dynamic_list.find(q, {"_id": 0}).sort([("pdate", -1)]).limit(size).skip((page - 1) * size)
@@ -209,7 +209,7 @@ def fuzzy_search():
     qre = {'$regex': regex, '$options': 'i'}
     u_res = g.up_list.find({'uname': qre}, {'_id': 0})
     sz_list = list(map(lambda i: i['id'], g.shazam_list.find({'title': qre}, {'_id': 0})))
-    dq = {"$and": [{"ustatus": {"$gt": 0}}, {'$or': [{'shazam_id': {'$in': sz_list}}, {'title': qre}, {'etitle': qre}]}]}
+    dq = {"$and": [{"ustatus": {"$gt": 0}}, {"dstatus": 200}, {'$or': [{'shazam_id': {'$in': sz_list}}, {'title': qre}, {'etitle': qre}]}]}
     d_res = g.dynamic_list.find(dq, {'_id': 0})
     
     return {'code': 0, 'data': { 'ups': list(u_res), 'videos': list(map(add_attach, d_res))[:50] }}
