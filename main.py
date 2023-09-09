@@ -347,8 +347,8 @@ def delete_from(pd, ts):
     del_list = g.dynamic_list.find(q)
     for item in del_list:
         find_and_remove(item)
-    g.dynamic_list.delete_one(q)
-    return {'code': 0, 'data': f'共删除 {len(del_list)} 条动态及视频'}
+    result = g.dynamic_list.delete_many(q)
+    return {'code': 0, 'data': f'共删除 {result.deleted_count} 条动态及视频'}
 
 # 外部导入vid
 @app.route('/api/add.vid', methods=['POST'])
@@ -383,7 +383,7 @@ def find_local():
         local = get_mp4_path(item)
         if local:
             linux_path = local[0]
-            windows_path = linux_path.replace('/media/', '')
+            windows_path = linux_path.replace('/media/', 'https://bdm.src.moe:8000/file/')
             return {'code': 0, 'data': windows_path}
     except Exception as err:
         return {'code': -2, 'data': str(err)}
