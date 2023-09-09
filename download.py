@@ -49,7 +49,7 @@ def download(client):
             'updatetime': False,
             'logger': YTBLogger(),
         }
-        
+
         # 开始下载
         logger.info(f'开始下载：{item_title}')
         switch_dl_status(item_vid, 100)
@@ -89,21 +89,21 @@ def download(client):
         except Exception as err:
             switch_dl_status(item_vid, -1, item)
             logger.error(f'下载失败[YoutubeDL]： {item_title}')
-            logger.error(err)         
-    
+            logger.error(err)
+
     logger.info('定时任务：下载视频')
     # 时长小于10分钟
     # 下载中
-    q1 = {"$and": [{"duration": {"$lt": 600000}}, {"dstatus": 100}]}
+    q1 = {"$and": [{"duration": {"$lt": 600}}, {"dstatus": 100}]}
     # 未下载
-    q2 = {"$and": [{"duration": {"$lt": 600000}}, {"dstatus": 0}]}
+    q2 = {"$and": [{"duration": {"$lt": 600}}, {"dstatus": 0}]}
     # 下载失败 && 可重试
-    q3 = {"$and": [{"duration": {"$lt": 600000}}, {"dstatus": {"$lt": 0}}, {"dl_retry": {"$lt": 3}}]}
-    
+    q3 = {"$and": [{"duration": {"$lt": 600}}, {"dstatus": {"$lt": 0}}, {"dl_retry": {"$lt": 3}}]}
+
     ing_list = dynamic_list.find(q1, {"_id": 0}).sort([("pdate", -1)])
     wait_list = dynamic_list.find(q2, {"_id": 0}).sort([("pdate", -1)])
     retry_list = dynamic_list.find(q3, {"_id": 0}).sort([("pdate", -1)])
     merge_list = [*ing_list, *wait_list, *retry_list]
-    
+
     for item in merge_list[:CONCURRENT_TASK_NUM]:
         download_video(item)

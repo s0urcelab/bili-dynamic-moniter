@@ -35,19 +35,12 @@ def update(client):
             vwidth = pinfo['data']['dash']['video'][0]['width']
             vheight = pinfo['data']['dash']['video'][0]['height']
             is_portrait = 1 if (vwidth / vheight < 1) else 0
-            duration = pinfo['data']['timelength']
+            duration = round(pinfo['data']['timelength'] / 1000)
         except:
             logger.error(f'获取 {bvid} 视频详情失败')
             # 直接失败处理
             return {'dstatus': -9}
-            
-            # # 字符串反算视频时长
-            # d_arr = duration_text.split(':')
-            # if len(d_arr) == 2:
-            #     duration = (int(d_arr[0]) * 60 + int(d_arr[1])) * 1000
-            # if len(d_arr) == 3:
-            #     duration = (int(d_arr[0]) * 3600 + int(d_arr[1]) * 60 + int(d_arr[2])) * 1000
-            # return {'duration': duration}
+
         else:
             return {'max_quality': max_quality, 'is_portrait': is_portrait, 'duration': duration}
 
@@ -70,6 +63,14 @@ def update(client):
             cover = item['modules']['module_dynamic']['major']['archive']['cover']
             desc = item['modules']['module_dynamic']['major']['archive']['desc']
             duration_text = item['modules']['module_dynamic']['major']['archive']['duration_text']
+            # 字符串反算视频时长
+            duration = 0
+            d_arr = duration_text.split(':')
+            if len(d_arr) == 2:
+                duration = int(d_arr[0]) * 60 + int(d_arr[1])
+            if len(d_arr) == 3:
+                duration = int(d_arr[0]) * 3600 + int(d_arr[1]) * 60 + int(d_arr[2])
+
             return {
                 'source': 2,
                 'uid': uid,
@@ -78,6 +79,7 @@ def update(client):
                 'vid': bvid,
                 'cover': cover,
                 'desc': desc,
+                'duration': duration,
                 'duration_text': duration_text,
                 'avatar': avatar, 
                 'pdate': pdate, 

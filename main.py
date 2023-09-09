@@ -214,18 +214,12 @@ def fuzzy_search():
     
     return {'code': 0, 'data': { 'ups': list(u_res), 'videos': list(map(add_attach, d_res))[:50] }}
 
-# # 排行榜
-# @app.route('/api/rank.list')
-# def rank_list():
-#     detail = g.dynamic_list.find_one({"vid": vid}, {"_id": 0})
-#     try:
-#         local = get_mp4_path(detail)
-#         if local:
-#             linux_path = local[0]
-#             filesrc = linux_path.replace('/media/', 'https://bdm.src.moe:8000/file/')
-#             return {'code': 0, 'data': {**add_attach(detail), 'filesrc': filesrc}}
-#     except Exception as err:
-#         return {'code': -2, 'data': str(err)}
+# UP主详情
+@app.route('/api/up.info/<uid>')
+def get_up_info(uid):
+    up_info = g.up_list.find_one({"uid": int(uid)}, {"_id": 0})
+    
+    return {'code': 0, 'data': up_info}
 
 # 动态列表
 @app.route('/api/dyn.list')
