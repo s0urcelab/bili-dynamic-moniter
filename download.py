@@ -98,7 +98,7 @@ def download(client):
     # 未下载
     q2 = {"$and": [{"duration": {"$lt": 600}}, {"dstatus": 0}]}
     # 下载失败 && 可重试
-    q3 = {"$and": [{"duration": {"$lt": 600}}, {"dstatus": {"$lt": 0}}, {"dl_retry": {"$lt": 3}}]}
+    q3 = {"$and": [{"duration": {"$lt": 600}}, {"dstatus": {"$lt": 0}}, {"dstatus": {"$ne": -9}}, {"dl_retry": {"$lt": 3}}]}
 
     ing_list = dynamic_list.find(q1, {"_id": 0}).sort([("pdate", -1)])
     wait_list = dynamic_list.find(q2, {"_id": 0}).sort([("pdate", -1)])
