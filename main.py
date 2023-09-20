@@ -185,9 +185,9 @@ def explore_list():
 @app.route('/api/video.detail/<vid>')
 def video_detail(vid):
     detail = g.dynamic_list.find_one({"vid": vid}, {"_id": 0})
-    uid = detail['uid']
-    q = {"$and": [{"uid": uid}, {"vid": { "$ne": vid }}, {"ustatus": {"$gt": 0}}]}
-    more_list = g.dynamic_list.find(q, {"_id": 0}).limit(6)
+    q = {"$and": [{"uid": detail['uid']}, {"vid": { "$ne": vid }}, {"ustatus": {"$gt": 0}}]}
+    q_list = g.dynamic_list.find(q, {"_id": 0}).limit(6)
+    more_list = list(map(add_attach, q_list))
     try:
         local = get_mp4_path(detail)
         if local:
