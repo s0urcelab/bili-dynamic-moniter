@@ -192,7 +192,7 @@ def video_detail(vid):
         local = get_mp4_path(detail)
         if local:
             linux_path = local[0]
-            filesrc = linux_path.replace('/media/', 'https://bdm.src.moe:8000/file/')
+            filesrc = linux_path.replace('/media/', 'https://rcc.src.moe:8000/file/')
             return {'code': 0, 'data': {**add_attach(detail), 'filesrc': filesrc}, 'more': list(more_list)}
     except Exception as err:
         return {'code': -2, 'data': str(err)}
@@ -377,7 +377,7 @@ def find_local():
         local = get_mp4_path(item)
         if local:
             linux_path = local[0]
-            windows_path = linux_path.replace('/media/', 'https://bdm.src.moe:8000/file/')
+            windows_path = linux_path.replace('/media/', 'https://rcc.src.moe:8000/file/')
             return {'code': 0, 'data': windows_path}
     except Exception as err:
         return {'code': -2, 'data': str(err)}
