@@ -29,7 +29,6 @@ def download(client):
     # 下载
     def download_video(item):
         item_vid = item['vid']
-        item_p = item['p'] if ('p' in item) else 1
         item_title = item['title']
         item_max_quality = item['max_quality']
         item_retry_count = item['dl_retry']

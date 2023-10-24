@@ -25,8 +25,7 @@ def update(client):
 
     def fetch_detail(item):
         bvid = item['vid']
-        duration_text = item['duration_text']
-        res = requests.get(VIDEO_DETAIL_API(bvid))
+        res = requests.get(VIDEO_DETAIL_API(bvid), headers={"user-agent": FAKE_USER_AGENT})
         try:
             play_info = re.search(r'<script>window.__playinfo__=([^<]+)</script>', res.text)
             pinfo = json.loads(play_info.group(1))
