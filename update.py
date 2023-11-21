@@ -19,8 +19,9 @@ def update(client):
         res_json = json.loads(res.text)
 
         if res_json['code'] != 0:
-            # logger.error()
-            raise Exception('获取关注列表失败，终止执行')
+            logger.error(f'获取关注列表第{page}页失败，重试')
+            return None
+            # raise Exception('获取关注列表失败，终止执行')
         return res_json['data']
 
     def fetch_detail(item):
@@ -49,7 +50,9 @@ def update(client):
         res_json = json.loads(res.text)
 
         if res_json['code'] != 0:
-            raise Exception('获取动态失败，终止执行')
+            logger.error(f'获取动态第{page}页失败，重试')
+            return None
+            # raise Exception('获取动态失败，终止执行')
         
         def flat_data(item):
             uid = item['modules']['module_author']['mid']
@@ -103,6 +106,8 @@ def update(client):
 
         while (content_len != 0):
             page_list = fetch_follow(page)
+            if page_list == None:
+                continue
             content_len = len(page_list)
             flist.extend(page_list)
             page = page + 1
@@ -136,8 +141,10 @@ def update(client):
 
     while (page < MAX_DYNAMIC_FETCH_PAGE):
         single_part = fetch_dynamic(page, offset)
+        if single_part == None:
+            continue
+        
         page_list = single_part['dlist']
-
         matchs = [i for (i, item) in enumerate(page_list) if item['pdate'] <= cpdate]
         if len(matchs) > 0:
             last_part = page_list[:matchs[0]]
