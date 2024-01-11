@@ -47,8 +47,7 @@ def add_attach(item):
     return ritem
 
 def parseBV(bvid, p = 1):
-    cookie = {'SESSDATA': DYNAMIC_COOKIE}
-    res_view = requests.get(VIDEO_VIEW_API(bvid), cookies=cookie)
+    res_view = requests.get(VIDEO_VIEW_API(bvid), headers={"user-agent": FAKE_USER_AGENT})
     res_json = json.loads(res_view.text)
     if res_json['code'] != 0:
         raise Exception(f'解析bvid失败')
@@ -384,3 +383,4 @@ def find_local():
 
 if __name__ == '__main__':
     app.run(debug=False)
+    # print(parseBV('BV15i4y1B7DF'))

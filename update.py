@@ -15,7 +15,7 @@ def update(client):
 
     def fetch_follow(page): 
         cookie = {'SESSDATA': DYNAMIC_COOKIE}
-        res = requests.get(USER_FOLLOW_API(page), cookies=cookie)
+        res = requests.get(USER_FOLLOW_API(page), cookies=cookie, headers={"user-agent": FAKE_USER_AGENT})
         res_json = json.loads(res.text)
 
         if res_json['code'] != 0:
@@ -46,7 +46,7 @@ def update(client):
 
     def fetch_dynamic(page, offset): 
         cookie = {'SESSDATA': DYNAMIC_COOKIE}
-        res = requests.get(USER_DYNAMIC_API(page, offset), cookies=cookie)
+        res = requests.get(USER_DYNAMIC_API(page, offset), cookies=cookie, headers={"user-agent": FAKE_USER_AGENT})
         res_json = json.loads(res.text)
 
         if res_json['code'] != 0:
