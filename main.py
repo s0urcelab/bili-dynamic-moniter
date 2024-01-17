@@ -24,10 +24,11 @@ app = Flask(__name__)
 # If true this will only allow the cookies that contain your JWTs to be sent
 # over https. In production, this should always be set to True
 app.config["JWT_COOKIE_SECURE"] = True
+app.config["JWT_COOKIE_CSRF_PROTECT"] = False
+app.config["JWT_SESSION_COOKIE"] = False
 app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
 app.config["JWT_SECRET_KEY"] = "fjls34hkfd89say6hi34er"  # Change this in your code!
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(weeks=2)
-app.config["JWT_SESSION_COOKIE"] = False
 
 jwt = JWTManager(app)
 
@@ -60,6 +61,7 @@ def login():
 
 
 @app.route("/api/admin.logout", methods=["POST"])
+@jwt_required()
 def logout():
     response = jsonify({'code': 0, 'data': '登出成功'})
     unset_jwt_cookies(response)
