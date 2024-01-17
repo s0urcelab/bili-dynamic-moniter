@@ -5,13 +5,65 @@ import re
 import json
 import time
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from constant import *
 from util import find_and_remove, get_mp4_path
-from flask import Flask, g, request
+from flask import Flask, g, request, jsonify
 from pymongo import MongoClient
 
+from flask_jwt_extended import create_access_token
+from flask_jwt_extended import get_jwt
+from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import jwt_required
+from flask_jwt_extended import JWTManager
+from flask_jwt_extended import set_access_cookies
+from flask_jwt_extended import unset_jwt_cookies
+
 app = Flask(__name__)
+
+# If true this will only allow the cookies that contain your JWTs to be sent
+# over https. In production, this should always be set to True
+app.config["JWT_COOKIE_SECURE"] = False
+app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
+app.config["JWT_SECRET_KEY"] = "fjls34hkfd89say6hi34er"  # Change this in your code!
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(weeks=2)
+app.config["JWT_SESSION_COOKIE"] = False
+
+jwt = JWTManager(app)
+
+@app.after_request
+def refresh_expiring_jwts(response):
+    """
+    刷新jwt
+    """
+    try:
+        exp_timestamp = get_jwt()["exp"]
+        now = datetime.now(timezone.utc)
+        target_timestamp = datetime.timestamp(now + timedelta(days=1))
+        if target_timestamp > exp_timestamp:
+            access_token = create_access_token(identity=get_jwt_identity())
+            set_access_cookies(response, access_token)
+        return response
+    except (RuntimeError, KeyError):
+        # Case where there is not a valid JWT. Just return the original response
+        return response
+    
+@app.route("/api/admin.login", methods=["POST"])
+def login():
+    p = request.json
+    if p['pw'] == MANAGE_PASSWORD:
+        response = jsonify({'code': 0, 'data': '登录成功'})
+        access_token = create_access_token(identity="admin")
+        set_access_cookies(response, access_token)
+        return response
+    return {'code': -300, 'data': '登录失败'}
+
+
+@app.route("/api/admin.logout", methods=["POST"])
+def logout():
+    response = jsonify({'code': 0, 'data': '登出成功'})
+    unset_jwt_cookies(response)
+    return response
 
 @app.before_request
 def before_request():
@@ -160,6 +212,7 @@ def catch_all(path):
 
 # 设定截止时间
 @app.route('/api/init/<datestring>')
+@jwt_required()
 def init_cpdate(datestring):
     cpdate = int(datetime.strptime(datestring, "%Y-%m-%d %H:%M:%S").timestamp())
     g.config.update_one({"check_point": {"$exists": True}}, {"$set": {"check_point": cpdate}}, upsert=True)
@@ -222,11 +275,13 @@ def get_up_info(uid):
 
 # 动态列表
 @app.route('/api/dyn.list')
+@jwt_required()
 def dyn_list():
     page = int(request.args.get('page') or 1)
     size = int(request.args.get('size') or 50)
     # 0全部，1下载失败，2上传ytb失败
     dtype = int(request.args.get('dtype') or 0)
+    uid = int(request.args.get('uid') or 0)
     # 所有失败类型
     # dl_err_q = where('dstatus') < 0
     # up_err_q = where('ustatus') < 0
@@ -234,6 +289,8 @@ def dyn_list():
         q = {"dstatus": {"$lt": 0}}
     elif dtype == 2:
         q = {"ustatus": {"$lt": 0}}
+    elif uid != 0:
+        q = {"uid": uid}
     else:
         q = {}
     # all_list = sorted(q_list, key=lambda i: i['pdate'], reverse=True)
@@ -246,6 +303,7 @@ def dyn_list():
 
 # 占用空间情况
 @app.route('/api/folder.size')
+@jwt_required()
 def folder_size():
     def get_dir_size(path=MEDIA_ROOT):
         total = 0
@@ -271,6 +329,7 @@ def folder_size():
 
 # 重试下载视频
 @app.route('/api/retry', methods=['POST'])
+@jwt_required()
 def retry_dl_video():
     vids = request.json
     for vid in vids:
@@ -282,6 +341,7 @@ def retry_dl_video():
 
 # 重置BGM识别状态
 @app.route('/api/reset.bgm', methods=['POST'])
+@jwt_required()
 def reset_bgm():
     vids = request.json
     for vid in vids:
@@ -291,6 +351,7 @@ def reset_bgm():
 
 # 重置上传状态
 @app.route('/api/reset.upload', methods=['POST'])
+@jwt_required()
 def reset_upload():
     vids = request.json
     for vid in vids:
@@ -300,6 +361,7 @@ def reset_upload():
 
 # 修改推测bgm标题
 @app.route('/api/edit.title', methods=['POST'])
+@jwt_required()
 def edit_title():
     js = request.json
     vid = js['vid']
@@ -315,6 +377,7 @@ def edit_title():
 
 # 投稿youtube
 @app.route('/api/upload.ytb', methods=['POST'])
+@jwt_required()
 def upload_ytb():
     vids = request.json
     for vid in vids:
@@ -323,6 +386,7 @@ def upload_ytb():
 
 # 删除动态&视频
 @app.route('/api/delete.video', methods=['POST'])
+@jwt_required()
 def delete_video():
     del_list = request.json
     for item in del_list:
@@ -332,6 +396,7 @@ def delete_video():
 
 # 删除该动态之后所有未投稿的视频
 @app.route('/api/delete.from/<pd>/to/<ts>')
+@jwt_required()
 def delete_from(pd, ts):
     pdate = int(pd)
     timestamp = int(ts)
@@ -345,6 +410,7 @@ def delete_from(pd, ts):
 
 # 外部导入vid
 @app.route('/api/add.vid', methods=['POST'])
+@jwt_required()
 def add_vid():
     tp = request.json['type']
     pure_vid = request.json['vid']
@@ -380,6 +446,8 @@ def find_local():
             return {'code': 0, 'data': windows_path}
     except Exception as err:
         return {'code': -2, 'data': str(err)}
+    
+
 
 if __name__ == '__main__':
     app.run(debug=False)
