@@ -384,7 +384,8 @@ def upload_ytb():
     vids = request.json
     for vid in vids:
         g.dynamic_list.update_one({"vid": vid}, {"$set": {"ustatus": 100}})
-    return {'code': 0, 'data': '添加上传任务成功'}
+    # return {'code': 0, 'data': '添加上传任务成功'}
+    return {'code': 0, 'data': '精选投稿成功'}
 
 # 删除动态&视频
 @app.route('/api/delete.video', methods=['POST'])
@@ -397,13 +398,18 @@ def delete_video():
     return {'code': 0, 'data': '删除投稿成功'}
 
 # 删除该动态之后所有未投稿的视频
-@app.route('/api/delete.from/<pd>/to/<ts>')
-@jwt_required()
-def delete_from(pd, ts):
-    pdate = int(pd)
-    timestamp = int(ts)
-    q = {"$and": [{"ustatus": 0}, {"pdate": {"$lte": timestamp}}, {"pdate": {"$gte": pdate}}]}
-    # q = (where('pdate') >= pdate) & (where('pdate') <= timestamp) & (where('ustatus') == 0)
+@app.route('/api/delete.batch', methods=['POST'])
+def delete_from():
+    js = request.json
+    uid = js.get('uid')
+    pdate = int(js.get('pd'))
+    timestamp = int(js.get('ts'))
+    q1 = {"ustatus": 0}
+    q2 = {"pdate": {"$lte": timestamp}}
+    q3 = {"pdate": {"$gte": pdate}}
+    q = {"$and": [q1, q2, q3]}
+    if uid:
+        q = {"$and": [q1, q2, q3, {"uid": int(uid)}]}
     del_list = g.dynamic_list.find(q)
     for item in del_list:
         find_and_remove(item)
