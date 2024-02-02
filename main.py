@@ -105,13 +105,16 @@ def parseBV(bvid, p = 1):
     res_json = json.loads(res_view.text)
     if res_json['code'] != 0:
         raise Exception(f'解析bvid失败')
-
+    
     res_detail = requests.get(VIDEO_DETAIL_API(bvid, p), headers={"user-agent": FAKE_USER_AGENT})
+    max_quality = ''
     try:
         play_info = re.search(r'<script>window.__playinfo__=([^<]+)</script>', res_detail.text)
         pinfo = json.loads(play_info.group(1))
     except:
-        raise Exception(f'解析bvid失败')
+        max_quality = '未知'
+    else:
+        max_quality = pinfo['data']['accept_description'][0]
 
     curr_page = res_json['data']['pages'][p - 1]
     title = res_json['data']['title']
@@ -127,7 +130,6 @@ def parseBV(bvid, p = 1):
     uid = res_json['data']['owner']['mid']
     uname = res_json['data']['owner']['name']
     avatar = res_json['data']['owner']['face']
-    max_quality = pinfo['data']['accept_description'][0]
     vwidth = curr_page['dimension']['width']
     vheight = curr_page['dimension']['height']
     is_portrait = 1 if (vwidth / vheight < 1) else 0
