@@ -281,6 +281,8 @@ def get_up_info(uid):
 @app.route('/api/dyn.list')
 @jwt_required()
 def dyn_list():
+    keyword = request.args.get('keyword')
+    
     page = int(request.args.get('page') or 1)
     size = int(request.args.get('size') or 50)
     # 0全部，1下载失败，2上传ytb失败
@@ -289,6 +291,18 @@ def dyn_list():
     # 所有失败类型
     # dl_err_q = where('dstatus') < 0
     # up_err_q = where('ustatus') < 0
+    # 管理页查询
+    if uid == 0 and keyword:
+        regex = f'.*{keyword}.*'
+        qre = {'$regex': regex, '$options': 'i'}
+        u_res = g.up_list.find({'uname': qre}, {'_id': 0})
+        sz_list = list(map(lambda i: i['id'], g.shazam_list.find({'title': qre}, {'_id': 0})))
+        dq = {"$and": [{'$or': [{'shazam_id': {'$in': sz_list}}, {'title': qre}, {'etitle': qre}]}]}
+        d_res = g.dynamic_list.find(dq, {'_id': 0}).sort([("pdate", -1)]).limit(size).skip((page - 1) * size)
+        total = g.dynamic_list.count_documents(dq)
+        
+        return {'code': 0, 'data': list(map(add_attach, d_res)), 'total': total, 'ups': list(u_res) }
+    
     if dtype == 1:
         q = {"dstatus": {"$lt": 0}}
     elif dtype == 2:
