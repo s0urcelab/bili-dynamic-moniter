@@ -4,6 +4,7 @@ import logging
 from constant import *
 from util import get_mp4_path, get_video_resolution, find_and_remove, legal_title, get_dl_url
 from yt_dlp import YoutubeDL
+from cloud189.client import Cloud189Client
 
 logger = logging.getLogger('bdm')
 
@@ -17,14 +18,16 @@ class DownloadError(Exception):
 
 def download(client):
     dynamic_list = client.dance.dynamic_list
+    client189 = Cloud189Client(username=CLOUD189_USERNAME, password=CLOUD189_PASSWORD)
 
     # 切换投稿下载状态
-    def switch_dl_status(vid, status, item=None):
-        dynamic_list.update_one({"vid": vid}, {"$set": {"dstatus": status}})
+    def switch_dl_status(vid, status, item=None, fid=None):
+        set_field = {"dstatus": status, "fid": fid} if fid else {"dstatus": status}
+        dynamic_list.update_one({"vid": vid}, {"$set": set_field})
         if status < 0:
             dynamic_list.update_one({"vid": vid}, {'$inc': {'dl_retry': 1}})
-            if item:
-                find_and_remove(item)
+        if (status < 0 and item) or fid:
+            find_and_remove(item)
 
     # 下载
     def download_video(item):
@@ -50,7 +53,7 @@ def download(client):
         }
 
         # 开始下载
-        logger.info(f'开始下载：{item_title}')
+        logger.info(f'开始下载[云盘]：{item_title} {item_vid}')
         switch_dl_status(item_vid, 100)
         try:
             with YoutubeDL(ydl_opts) as ydl:
@@ -58,6 +61,9 @@ def download(client):
                 ydl.download([url])
 
             mp4_files = get_mp4_path(item)
+            # 上传天翼云盘
+            fid = client189.upload(mp4_files[0], f'{item_vid}.mp4', CLOUD189_TARGET_FOLDER_ID)
+            
             # 文件不存在
             if not mp4_files:
                 raise DownloadError('视频文件不存在', -2)
@@ -77,8 +83,8 @@ def download(client):
                     raise DownloadError('分辨率不达标', -3)
 
             # 下载文件检验成功
-            switch_dl_status(item_vid, 200)
-            logger.info(f'下载成功：{item_title}')
+            switch_dl_status(item_vid, 200, item, fid)
+            logger.info(f'下载成功[云盘]：{item_title} {item_vid}')
         except DownloadError as err:
             if err.code == -3:
                 switch_dl_status(item_vid, err.code, (item_retry_count < 2) and item)

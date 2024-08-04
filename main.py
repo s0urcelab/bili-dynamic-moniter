@@ -10,6 +10,7 @@ from constant import *
 from util import find_and_remove, get_mp4_path
 from flask import Flask, g, request, jsonify
 from pymongo import MongoClient
+from cloud189.client import Cloud189Client
 
 from flask_jwt_extended import create_access_token
 from flask_jwt_extended import get_jwt
@@ -20,6 +21,7 @@ from flask_jwt_extended import set_access_cookies
 from flask_jwt_extended import unset_jwt_cookies
 
 app = Flask(__name__)
+client189 = Cloud189Client(username=CLOUD189_USERNAME, password=CLOUD189_PASSWORD)
 
 # If true this will only allow the cookies that contain your JWTs to be sent
 # over https. In production, this should always be set to True
@@ -209,10 +211,10 @@ def parseAC(acid, p = 1):
     }
     
 # 托管静态资源
-@app.route('/', defaults={'path': ''})
-@app.route('/<path:path>')
-def catch_all(path):
-    return app.send_static_file("index.html")
+# @app.route('/', defaults={'path': ''})
+# @app.route('/<path:path>')
+# def catch_all(path):
+#     return app.send_static_file("index.html")
 
 # 设定截止时间
 @app.route('/api/init/<datestring>')
@@ -244,6 +246,9 @@ def video_detail(vid):
     q = {"$and": [{"uid": detail['uid']}, {"vid": { "$ne": vid }}, {"ustatus": {"$gt": 0}}]}
     q_list = g.dynamic_list.find(q, {"_id": 0}).limit(6)
     more_list = list(map(add_attach, q_list))
+    if 'fid' in detail and detail['fid']:
+        play_url = client189.get_play_url(detail['fid'])
+        return {'code': 0, 'data': {**add_attach(detail), 'filesrc': play_url}, 'more': list(more_list)}
     try:
         local = get_mp4_path(detail)
         if local:
@@ -394,14 +399,14 @@ def edit_title():
     return {'code': 0, 'data': '修改自定义标题成功'}
 
 # 投稿youtube
-@app.route('/api/upload.ytb', methods=['POST'])
-@jwt_required()
-def upload_ytb():
-    vids = request.json
-    for vid in vids:
-        g.dynamic_list.update_one({"vid": vid}, {"$set": {"ustatus": 100}})
-    # return {'code': 0, 'data': '添加上传任务成功'}
-    return {'code': 0, 'data': '精选投稿成功'}
+# @app.route('/api/upload.ytb', methods=['POST'])
+# @jwt_required()
+# def upload_ytb():
+#     vids = request.json
+#     for vid in vids:
+#         g.dynamic_list.update_one({"vid": vid}, {"$set": {"ustatus": 100}})
+#     # return {'code': 0, 'data': '添加上传任务成功'}
+#     return {'code': 0, 'data': '精选投稿成功'}
 
 # 删除动态&视频
 @app.route('/api/delete.video', methods=['POST'])
@@ -409,7 +414,7 @@ def upload_ytb():
 def delete_video():
     del_list = request.json
     for item in del_list:
-        find_and_remove(item)
+        find_and_remove(item, client189)
         g.dynamic_list.delete_one({"vid": item['vid']})
     return {'code': 0, 'data': '删除投稿成功'}
 
@@ -428,7 +433,7 @@ def delete_from():
         q = {"$and": [q1, q2, q3, {"uid": int(uid)}]}
     del_list = g.dynamic_list.find(q)
     for item in del_list:
-        find_and_remove(item)
+        find_and_remove(item, client189)
     result = g.dynamic_list.delete_many(q)
     return {'code': 0, 'data': f'共删除 {result.deleted_count} 条动态及视频'}
 
@@ -462,6 +467,10 @@ def add_vid():
 @app.route('/api/find.local', methods=['POST'])
 def find_local():
     item = request.json
+    if 'fid' in item and item['fid']:
+        play_url = client189.get_play_url(item['fid'])
+        return {'code': 0, 'data': play_url}
+    
     try:
         local = get_mp4_path(item)
         if local:

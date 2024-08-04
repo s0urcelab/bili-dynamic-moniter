@@ -70,7 +70,10 @@ def get_video_resolution(filename):
     return (width, height, bitrate, fps)
 
 # 查找本地文件并删除
-def find_and_remove(item):
+def find_and_remove(item, client189=None):
+    if ('fid' in item) and ('vid' in item) and client189:
+        client189.delete(item['fid'], f'{item["vid"]}.mp4')
+        return
     for i in get_frag_path(item):
         os.remove(i)
     for i in get_mp4_path(item):

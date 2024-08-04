@@ -1,0 +1,3 @@
+[submodule "cloud189"]
+	path = cloud189
+	url = ../cloud189.git
