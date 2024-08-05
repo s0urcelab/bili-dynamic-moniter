@@ -398,15 +398,15 @@ def edit_title():
         g.shazam_list.update_one({"id": shazam_id}, {"$set": {"title": etitle}})
     return {'code': 0, 'data': '修改自定义标题成功'}
 
-# 投稿youtube
-# @app.route('/api/upload.ytb', methods=['POST'])
-# @jwt_required()
-# def upload_ytb():
-#     vids = request.json
-#     for vid in vids:
-#         g.dynamic_list.update_one({"vid": vid}, {"$set": {"ustatus": 100}})
-#     # return {'code': 0, 'data': '添加上传任务成功'}
-#     return {'code': 0, 'data': '精选投稿成功'}
+# 精选投稿
+@app.route('/api/upload.ytb', methods=['POST'])
+@jwt_required()
+def upload_ytb():
+    vids = request.json
+    for vid in vids:
+        g.dynamic_list.update_one({"vid": vid}, {"$set": {"ustatus": 100}})
+    # return {'code': 0, 'data': '添加上传任务成功'}
+    return {'code': 0, 'data': '精选投稿成功'}
 
 # 删除动态&视频
 @app.route('/api/delete.video', methods=['POST'])
