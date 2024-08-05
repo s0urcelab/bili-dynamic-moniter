@@ -2,14 +2,15 @@
 
 import logging
 from constant import *
-from util import get_mp4_path
+from util import get_mp4_path, find_and_remove
 from shazamio import Shazam, Serialize
+from cloud189.client import Cloud189Client
 
 logger = logging.getLogger('bdm')
     
 async def shazam_match(client):
     shazam = Shazam()
-    
+    client189 = Cloud189Client(username=CLOUD189_USERNAME, password=CLOUD189_PASSWORD)
     dynamic_list = client.dance.dynamic_list
     shazam_list = client.dance.shazam_list
 
@@ -45,6 +46,10 @@ async def shazam_match(client):
             except:
                 dynamic_list.update_one({"vid": vid}, {"$set": {"shazam_id": -3}})
                 logger.error(f'shazam错误：{origin_title}')
+            finally:
+                # 匹配后删除已上传天翼云的资源
+                if item['fid']:
+                    find_and_remove(item)
 
     logger.info('定时任务：匹配BGM')
     q_sz = {"$and": [{"shazam_id": 0}, {"dstatus": 200}]}

@@ -246,11 +246,11 @@ def video_detail(vid):
     q = {"$and": [{"uid": detail['uid']}, {"vid": { "$ne": vid }}, {"ustatus": {"$gt": 0}}]}
     q_list = g.dynamic_list.find(q, {"_id": 0}).limit(6)
     more_list = list(map(add_attach, q_list))
-    if 'fid' in detail and detail['fid']:
-        play_url = client189.get_play_url(detail['fid'])
-        return {'code': 0, 'data': {**add_attach(detail), 'filesrc': play_url}, 'more': list(more_list)}
     try:
         local = get_mp4_path(detail)
+        if 'fid' in detail and detail['fid']:
+            play_url = client189.get_play_url(detail['fid'])
+            return {'code': 0, 'data': {**add_attach(detail), 'filesrc': play_url}, 'more': list(more_list)}
         if local:
             linux_path = local[0]
             filesrc = linux_path.replace('/media/', 'https://rcc.src.moe:8000/file/')

@@ -2,7 +2,7 @@
 import os
 import logging
 from constant import *
-from util import get_mp4_path, get_video_resolution, find_and_remove, legal_title, get_dl_url
+from util import get_mp4_path, get_video_resolution, find_and_remove, legal_title, get_dl_url, get_cover_path
 from yt_dlp import YoutubeDL
 from cloud189.client import Cloud189Client
 
@@ -21,12 +21,12 @@ def download(client):
     client189 = Cloud189Client(username=CLOUD189_USERNAME, password=CLOUD189_PASSWORD)
 
     # 切换投稿下载状态
-    def switch_dl_status(vid, status, item=None, fid=None):
-        set_field = {"dstatus": status, "fid": fid} if fid else {"dstatus": status}
+    def switch_dl_status(vid, status, item=None, add=None):
+        set_field = {"dstatus": status, **add} if add else {"dstatus": status}
         dynamic_list.update_one({"vid": vid}, {"$set": set_field})
         if status < 0:
             dynamic_list.update_one({"vid": vid}, {'$inc': {'dl_retry': 1}})
-        if (status < 0 and item) or fid:
+        if status < 0 and item:
             find_and_remove(item)
 
     # 下载
@@ -61,8 +61,11 @@ def download(client):
                 ydl.download([url])
 
             mp4_files = get_mp4_path(item)
-            # 上传天翼云盘
-            fid = client189.upload(mp4_files[0], f'{item_vid}.mp4', CLOUD189_TARGET_FOLDER_ID)
+            cover_files = get_cover_path(item)
+            # 上传视频to天翼云盘
+            fid = client189.upload(mp4_files[0], CLOUD189_TARGET_FOLDER_ID, item_vid)
+            # 上传封面to天翼云盘
+            cover_fid = client189.upload(cover_files[0], CLOUD189_TARGET_FOLDER_ID, item_vid)
             
             # 文件不存在
             if not mp4_files:
@@ -83,7 +86,7 @@ def download(client):
                     raise DownloadError('分辨率不达标', -3)
 
             # 下载文件检验成功
-            switch_dl_status(item_vid, 200, item, fid)
+            switch_dl_status(item_vid, 200, item, {"fid": fid, "cover_fid": cover_fid})
             logger.info(f'下载成功[云盘]：{item_title} {item_vid}')
         except DownloadError as err:
             if err.code == -3:
