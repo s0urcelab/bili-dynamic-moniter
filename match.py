@@ -4,13 +4,11 @@ import logging
 from constant import *
 from util import get_mp4_path, find_and_remove
 from shazamio import Shazam, Serialize
-from cloud189.client import Cloud189Client
 
 logger = logging.getLogger('bdm')
     
 async def shazam_match(client):
     shazam = Shazam()
-    client189 = Cloud189Client(username=CLOUD189_USERNAME, password=CLOUD189_PASSWORD)
     dynamic_list = client.dance.dynamic_list
     shazam_list = client.dance.shazam_list
 

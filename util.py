@@ -72,7 +72,11 @@ def get_video_resolution(filename):
 # 查找本地文件并删除
 def find_and_remove(item, client189=None):
     if ('fid' in item) and ('vid' in item) and client189:
+        # 视频本体
         client189.delete(item['fid'], f'{item["vid"]}.mp4')
+        # 视频封面
+        client189.delete(item['cover_fid'], f'{item["vid"]}.jpg')
+        client189.delete(item['cover_fid'], f'{item["vid"]}.png')
         return
     for i in get_frag_path(item):
         os.remove(i)

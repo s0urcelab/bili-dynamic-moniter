@@ -97,7 +97,7 @@ def download(client):
         except Exception as err:
             switch_dl_status(item_vid, -1, item)
             logger.error(f'下载失败[YoutubeDL]： {item_title}')
-            logger.error(err)
+            logger.error(err, exc_info=True)
 
     logger.info('定时任务：下载视频')
     # 时长小于10分钟且大于20秒
