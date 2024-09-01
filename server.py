@@ -4,10 +4,11 @@ import os
 import re
 import json
 import time
+import threading
 import requests
 from datetime import datetime, timedelta, timezone
 from constant import *
-from util import find_and_remove, get_mp4_path
+from util import find_and_remove, get_mp4_path, get_cover_path
 from flask import Flask, g, request, jsonify
 from pymongo import MongoClient
 from cloud189.client import Cloud189Client
@@ -19,9 +20,11 @@ from flask_jwt_extended import jwt_required
 from flask_jwt_extended import JWTManager
 from flask_jwt_extended import set_access_cookies
 from flask_jwt_extended import unset_jwt_cookies
-
+            
 app = Flask(__name__)
-client189 = Cloud189Client(username=CLOUD189_USERNAME, password=CLOUD189_PASSWORD)
+
+app.client189 = Cloud189Client(username=CLOUD189_USERNAME, password=CLOUD189_PASSWORD)
+app.start_event = threading.Event()
 
 # If true this will only allow the cookies that contain your JWTs to be sent
 # over https. In production, this should always be set to True
@@ -29,10 +32,38 @@ app.config["JWT_COOKIE_SECURE"] = True
 app.config["JWT_COOKIE_CSRF_PROTECT"] = False
 app.config["JWT_SESSION_COOKIE"] = False
 app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
-app.config["JWT_SECRET_KEY"] = "fjls34hkfd89say6hi34er"  # Change this in your code!
+app.config["JWT_SECRET_KEY"] = JWT_SECRET_KEY
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(weeks=2)
 
 jwt = JWTManager(app)
+
+"""
+单开一个线程执行历史视频上传
+"""
+def upload_task(sevent):
+    client = MongoClient(MONGODB_URL)
+    while sevent.is_set():
+        q = {"$and": [{"ustatus": {"$gt": USTATUS.DEFAULT}}, {"dstatus": DSTATUS.LOCAL}, {'fid': {'$exists': False}}]}
+        all_res = client.dance.dynamic_list.find(q, {"_id": 0}).sort([("pdate", 1)])
+        item = next(all_res, None)
+        if item:
+            try:
+                mp4_files = get_mp4_path(item)
+                cover_files = get_cover_path(item)
+                # 上传视频to天翼云盘
+                fid = app.client189.upload(mp4_files[0], CLOUD189_TARGET_FOLDER_ID, item['vid'])
+                cover_fid = app.client189.upload(cover_files[0], CLOUD189_TARGET_FOLDER_ID, item['vid'])
+                # 更新fid
+                client.dance.dynamic_list.update_one({"vid": item['vid']}, {"$set": {"dstatus": DSTATUS.CLOUD189, "fid": fid, "cover_fid": cover_fid}})
+                # 删除本地文件
+                find_and_remove(item)
+            except:
+                sevent.clear()
+        else:
+            # 没有新的待上传，等待5分钟重试
+            time.sleep(300)
+    
+    client.close()
 
 @app.after_request
 def refresh_expiring_jwts(response):
@@ -158,7 +189,7 @@ def parseBV(bvid, p = 1):
         'shazam_id': 0,
         'dstatus': 0,
         'dl_retry': 0,
-        'ustatus': 100,
+        'ustatus': USTATUS.SELECTED,
         'up_retry': 0,
     }
 
@@ -206,7 +237,7 @@ def parseAC(acid, p = 1):
         'shazam_id': 0,
         'dstatus': 0,
         'dl_retry': 0,
-        'ustatus': 100,
+        'ustatus': USTATUS.SELECTED,
         'up_retry': 0,
     }
     
@@ -231,8 +262,8 @@ def explore_list():
     size = int(request.args.get('size') or 15)
     uid = int(request.args.get('uid') or 0)
     
-    q1 = {"$and": [{"ustatus": {"$gt": 0}}, {"dstatus": 200}]}
-    q2 = {"$and": [{"uid": uid}, {"ustatus": {"$gt": 0}}, {"dstatus": 200}]}
+    q1 = {"$and": [{"ustatus": {"$gt": USTATUS.DEFAULT}}, {"dstatus": {"$gte": DSTATUS.LOCAL}}]}
+    q2 = {"$and": [{"uid": uid}, {"ustatus": {"$gt": USTATUS.DEFAULT}}, {"dstatus": {"$gte": DSTATUS.LOCAL}}]}
     q = q1 if uid == 0 else q2
     total = g.dynamic_list.count_documents(q)
     clist = g.dynamic_list.find(q, {"_id": 0}).sort([("pdate", -1)]).limit(size).skip((page - 1) * size)
@@ -243,13 +274,13 @@ def explore_list():
 @app.route('/api/video.detail/<vid>')
 def video_detail(vid):
     detail = g.dynamic_list.find_one({"vid": vid}, {"_id": 0})
-    q = {"$and": [{"uid": detail['uid']}, {"vid": { "$ne": vid }}, {"ustatus": {"$gt": 0}}]}
+    q = {"$and": [{"uid": detail['uid']}, {"vid": { "$ne": vid }}, {"ustatus": {"$gt": USTATUS.DEFAULT}}]}
     q_list = g.dynamic_list.find(q, {"_id": 0}).limit(6)
     more_list = list(map(add_attach, q_list))
     try:
         local = get_mp4_path(detail)
         if 'fid' in detail and detail['fid']:
-            play_url = client189.get_play_url(detail['fid'])
+            play_url = app.client189.get_play_url(detail['fid'])
             return {'code': 0, 'data': {**add_attach(detail), 'filesrc': play_url}, 'more': list(more_list)}
         if local:
             linux_path = local[0]
@@ -270,7 +301,7 @@ def fuzzy_search():
     qre = {'$regex': regex, '$options': 'i'}
     u_res = g.up_list.find({'uname': qre}, {'_id': 0})
     sz_list = list(map(lambda i: i['id'], g.shazam_list.find({'title': qre}, {'_id': 0})))
-    dq = {"$and": [{"ustatus": {"$gt": 0}}, {"dstatus": 200}, {'$or': [{'shazam_id': {'$in': sz_list}}, {'title': qre}, {'etitle': qre}]}]}
+    dq = {"$and": [{"ustatus": {"$gt": USTATUS.DEFAULT}}, {"dstatus": {"$gte": DSTATUS.LOCAL}}, {'$or': [{'shazam_id': {'$in': sz_list}}, {'title': qre}, {'etitle': qre}]}]}
     d_res = g.dynamic_list.find(dq, {'_id': 0})
     
     return {'code': 0, 'data': { 'ups': list(u_res), 'videos': list(map(add_attach, d_res))[:50] }}
@@ -309,9 +340,9 @@ def dyn_list():
         return {'code': 0, 'data': list(map(add_attach, d_res)), 'total': total, 'ups': list(u_res) }
     
     if dtype == 1:
-        q = {"dstatus": {"$lt": 0}}
+        q = {"dstatus": {"$lt": DSTATUS.DEFAULT}}
     elif dtype == 2:
-        q = {"ustatus": {"$lt": 0}}
+        q = {"ustatus": {"$lt": USTATUS.DEFAULT}}
     elif uid != 0:
         q = {"uid": uid}
     else:
@@ -324,6 +355,20 @@ def dyn_list():
 
     return {'code': 0, 'data': list(map(add_attach, current_list)), 'total': total }
 
+# 重置后台独立线程任务
+@app.route('/api/toggle.bgtask')
+@jwt_required()
+def toggle_bg_task():
+    status = request.args.get('status')
+    if status == 'on':
+        app.start_event.set()
+        threading.Thread(target=upload_task, args=(app.start_event,), daemon=True).start()
+    elif status == 'off':
+        app.start_event.clear()
+    else:
+        pass
+    return {'code': 0, 'data': f'后台任务{"启动" if app.start_event.is_set() else "停止"}'}
+    
 # 占用空间情况
 @app.route('/api/folder.size')
 @jwt_required()
@@ -338,15 +383,16 @@ def folder_size():
                     total += get_dir_size(entry.path)
         return round(total / (1024 ** 3), 2)
     
-    wait_count = g.dynamic_list.count_documents({"ustatus": 100})
-    up_count = g.dynamic_list.count_documents({"ustatus": 200})
+    # wait_count = g.dynamic_list.count_documents({"ustatus": USTATUS.SELECTED})
+    # up_count = g.dynamic_list.count_documents({"ustatus": USTATUS.UPLOADED})
     
     return {
         'code': 0,
         'data': {
             'size': f'{get_dir_size()}GB',
-            'waiting': wait_count,
-            'uploaded': up_count,
+            # 'waiting': wait_count,
+            # 'uploaded': up_count,
+            'is_bg_task_running': app.start_event.is_set(),
         }
     }
 
@@ -378,7 +424,7 @@ def reset_bgm():
 def reset_upload():
     vids = request.json
     for vid in vids:
-        g.dynamic_list.update_one({"vid": vid}, {"$set": {"ustatus": 100, "up_retry": 0}})
+        g.dynamic_list.update_one({"vid": vid}, {"$set": {"ustatus": USTATUS.SELECTED, "up_retry": 0}})
 
     return {'code': 0, 'data': f'重置上传状态成功'}
 
@@ -404,7 +450,7 @@ def edit_title():
 def upload_ytb():
     vids = request.json
     for vid in vids:
-        g.dynamic_list.update_one({"vid": vid}, {"$set": {"ustatus": 100}})
+        g.dynamic_list.update_one({"vid": vid}, {"$set": {"ustatus": USTATUS.SELECTED}})
     # return {'code': 0, 'data': '添加上传任务成功'}
     return {'code': 0, 'data': '精选投稿成功'}
 
@@ -414,7 +460,7 @@ def upload_ytb():
 def delete_video():
     del_list = request.json
     for item in del_list:
-        find_and_remove(item, client189)
+        find_and_remove(item, app.client189)
         g.dynamic_list.delete_one({"vid": item['vid']})
     return {'code': 0, 'data': '删除投稿成功'}
 
@@ -425,7 +471,7 @@ def delete_from():
     uid = js.get('uid')
     pdate = int(js.get('pd'))
     timestamp = int(js.get('ts'))
-    q1 = {"ustatus": 0}
+    q1 = {"ustatus": USTATUS.DEFAULT}
     q2 = {"pdate": {"$lte": timestamp}}
     q3 = {"pdate": {"$gte": pdate}}
     q = {"$and": [q1, q2, q3]}
@@ -433,7 +479,7 @@ def delete_from():
         q = {"$and": [q1, q2, q3, {"uid": int(uid)}]}
     del_list = g.dynamic_list.find(q)
     for item in del_list:
-        find_and_remove(item, client189)
+        find_and_remove(item, app.client189)
     result = g.dynamic_list.delete_many(q)
     return {'code': 0, 'data': f'共删除 {result.deleted_count} 条动态及视频'}
 
@@ -468,7 +514,7 @@ def add_vid():
 def find_local():
     item = request.json
     if 'fid' in item and item['fid']:
-        play_url = client189.get_play_url(item['fid'])
+        play_url = app.client189.get_play_url(item['fid'])
         return {'code': 0, 'data': play_url}
     
     try:

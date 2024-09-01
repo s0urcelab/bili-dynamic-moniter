@@ -47,9 +47,10 @@ async def shazam_match(client):
             finally:
                 # 匹配后删除已上传天翼云的资源
                 if item['fid']:
+                    dynamic_list.update_one({"vid": vid}, {"$set": {"dstatus": DSTATUS.CLOUD189}})
                     find_and_remove(item)
 
     logger.info('定时任务：匹配BGM')
-    q_sz = {"$and": [{"shazam_id": 0}, {"dstatus": 200}]}
+    q_sz = {"$and": [{"shazam_id": 0}, {"dstatus": DSTATUS.LOCAL}]}
     wait_match_list = dynamic_list.find(q_sz, {"_id": 0}).sort([("pdate", -1)]).limit(CONCURRENT_TASK_NUM)
     await shazam_bgm(wait_match_list)

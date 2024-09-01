@@ -86,7 +86,7 @@ def download(client):
                     raise DownloadError('分辨率不达标', -3)
 
             # 下载文件检验成功
-            switch_dl_status(item_vid, 200, item, {"fid": fid, "cover_fid": cover_fid})
+            switch_dl_status(item_vid, DSTATUS.LOCAL, item, {"fid": fid, "cover_fid": cover_fid})
             logger.info(f'下载成功[云盘]：{item_title} {item_vid}')
         except DownloadError as err:
             if err.code == -3:

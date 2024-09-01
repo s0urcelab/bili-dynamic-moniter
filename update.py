@@ -89,7 +89,7 @@ def update(client):
                 'shazam_id': 0,
                 'dstatus': 0,
                 'dl_retry': 0,
-                'ustatus': 0,
+                'ustatus': USTATUS.DEFAULT,
                 'up_retry': 0,
             }
 

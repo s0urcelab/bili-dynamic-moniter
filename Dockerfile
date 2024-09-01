@@ -20,7 +20,7 @@ RUN pip install -r requirements.txt --no-cache-dir
 # 执行定时任务
 # CMD ["cron","-f", "-l", "2"]
 # 运行flask
-CMD ["gunicorn", "main:app", "-c", "./gunicorn.conf.py"]
+CMD ["gunicorn", "server:app", "-c", "./gunicorn.conf.py"]
 
 EXPOSE 7002
 
