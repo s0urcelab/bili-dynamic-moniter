@@ -49,7 +49,9 @@ def get_cover_path(item):
             result.extend(files)
         return result
     else:
-        return glob.glob(os.path.join(MEDIA_ROOT, f'*{source}*.png'))
+        png = glob.glob(os.path.join(MEDIA_ROOT, f'*{source}*.png'))
+        jpg = glob.glob(os.path.join(MEDIA_ROOT, f'*{source}*.jpg'))
+        return [*png, *jpg]
 
 def get_frag_path(item):
     vid = item['vid']

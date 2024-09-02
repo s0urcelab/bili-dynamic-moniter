@@ -25,6 +25,8 @@ app = Flask(__name__)
 
 app.client189 = Cloud189Client(username=CLOUD189_USERNAME, password=CLOUD189_PASSWORD)
 app.start_event = threading.Event()
+app.err_msg = ''
+app.err_item = ''
 
 # If true this will only allow the cookies that contain your JWTs to be sent
 # over https. In production, this should always be set to True
@@ -40,25 +42,33 @@ jwt = JWTManager(app)
 """
 单开一个线程执行历史视频上传
 """
-def upload_task(sevent):
+def upload_task(app):
     client = MongoClient(MONGODB_URL)
-    while sevent.is_set():
+    while app.start_event.is_set():
         q = {"$and": [{"ustatus": {"$gt": USTATUS.DEFAULT}}, {"dstatus": DSTATUS.LOCAL}, {'fid': {'$exists': False}}]}
         all_res = client.dance.dynamic_list.find(q, {"_id": 0}).sort([("pdate", 1)])
         item = next(all_res, None)
         if item:
+            # 封面
+            try:
+                cover_files = get_cover_path(item)
+                cover_fid = app.client189.upload(cover_files[0], CLOUD189_TARGET_FOLDER_ID, item['vid'])
+            except:
+                pass
+            else:
+                client.dance.dynamic_list.update_one({"vid": item['vid']}, {"$set": {"cover_fid": cover_fid}})
+                
+            # 视频
             try:
                 mp4_files = get_mp4_path(item)
-                cover_files = get_cover_path(item)
-                # 上传视频to天翼云盘
                 fid = app.client189.upload(mp4_files[0], CLOUD189_TARGET_FOLDER_ID, item['vid'])
-                cover_fid = app.client189.upload(cover_files[0], CLOUD189_TARGET_FOLDER_ID, item['vid'])
-                # 更新fid
-                client.dance.dynamic_list.update_one({"vid": item['vid']}, {"$set": {"dstatus": DSTATUS.CLOUD189, "fid": fid, "cover_fid": cover_fid}})
-                # 删除本地文件
+            except Exception as err:
+                app.start_event.clear()
+                app.err_item = f'[{item["vid"]}] {item["title"]}'
+                app.err_msg = repr(err)
+            else:
+                client.dance.dynamic_list.update_one({"vid": item['vid']}, {"$set": {"dstatus": DSTATUS.CLOUD189, "fid": fid}})
                 find_and_remove(item)
-            except:
-                sevent.clear()
         else:
             # 没有新的待上传，等待5分钟重试
             time.sleep(300)
@@ -362,7 +372,7 @@ def toggle_bg_task():
     status = request.args.get('status')
     if status == 'on':
         app.start_event.set()
-        threading.Thread(target=upload_task, args=(app.start_event,), daemon=True).start()
+        threading.Thread(target=upload_task, args=(app,), daemon=True).start()
     elif status == 'off':
         app.start_event.clear()
     else:
@@ -393,6 +403,8 @@ def folder_size():
             # 'waiting': wait_count,
             # 'uploaded': up_count,
             'is_bg_task_running': app.start_event.is_set(),
+            'task_err_msg': app.err_msg,
+            'task_err_item': app.err_item,
         }
     }
 
@@ -523,6 +535,8 @@ def find_local():
             linux_path = local[0]
             windows_path = linux_path.replace('/media/', 'https://rcc.src.moe:8000/file/')
             return {'code': 0, 'data': windows_path}
+        else:
+            return {'code': -3, 'data': '文件不存在'}
     except Exception as err:
         return {'code': -2, 'data': str(err)}
     
