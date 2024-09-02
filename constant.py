@@ -25,6 +25,7 @@ ACFUN_VIDEO_PLAY_API = lambda acid, p=1: f'https://www.acfun.cn/v/{acid}_{p}'
 
 class DSTATUS:
     DEFAULT = 0
+    DOWNLOADING = 100
     LOCAL = 200
     CLOUD189 = 201
     

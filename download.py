@@ -101,17 +101,20 @@ def download(client):
 
     logger.info('定时任务：下载视频')
     # 时长小于10分钟且大于20秒
+    # 精选
+    qs = {"$and": [{"ustatus": {"$gte": USTATUS.SELECTED}}, {"dstatus": DSTATUS.DEFAULT}]}
     # 下载中
-    q1 = {"$and": [{"duration": {"$lt": 600}}, {"duration": {"$gt": 20}}, {"dstatus": 100}]}
+    q1 = {"$and": [{"duration": {"$lt": 600}}, {"duration": {"$gt": 20}}, {"dstatus": DSTATUS.DOWNLOADING}]}
     # 未下载
-    q2 = {"$and": [{"duration": {"$lt": 600}}, {"duration": {"$gt": 20}}, {"dstatus": 0}]}
+    q2 = {"$and": [{"duration": {"$lt": 600}}, {"duration": {"$gt": 20}}, {"dstatus": DSTATUS.DEFAULT}]}
     # 下载失败 && 可重试
-    q3 = {"$and": [{"duration": {"$lt": 600}}, {"duration": {"$gt": 20}}, {"dstatus": {"$lt": 0}}, {"dstatus": {"$ne": -9}}, {"dl_retry": {"$lt": 3}}]}
+    q3 = {"$and": [{"duration": {"$lt": 600}}, {"duration": {"$gt": 20}}, {"dstatus": {"$lt": DSTATUS.DEFAULT}}, {"dstatus": {"$ne": -9}}, {"dl_retry": {"$lt": 3}}]}
 
+    sel_list = dynamic_list.find(qs, {"_id": 0}).sort([("pdate", -1)])
     ing_list = dynamic_list.find(q1, {"_id": 0}).sort([("pdate", -1)])
     wait_list = dynamic_list.find(q2, {"_id": 0}).sort([("pdate", -1)])
     retry_list = dynamic_list.find(q3, {"_id": 0}).sort([("pdate", -1)])
-    merge_list = [*ing_list, *wait_list, *retry_list]
+    merge_list = [*sel_list, *ing_list, *wait_list, *retry_list]
 
     for item in merge_list[:CONCURRENT_TASK_NUM]:
         download_video(item)
