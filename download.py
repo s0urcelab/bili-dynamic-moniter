@@ -61,11 +61,11 @@ def download(client):
                 ydl.download([url])
 
             mp4_files = get_mp4_path(item)
-            cover_files = get_cover_path(item)
+            # cover_files = get_cover_path(item)
             # 上传视频to天翼云盘
             fid = client189.upload(mp4_files[0], CLOUD189_TARGET_FOLDER_ID, item_vid)
             # 上传封面to天翼云盘
-            cover_fid = client189.upload(cover_files[0], CLOUD189_TARGET_FOLDER_ID, item_vid)
+            # cover_fid = client189.upload(cover_files[0], CLOUD189_TARGET_FOLDER_ID, item_vid)
             
             # 文件不存在
             if not mp4_files:
@@ -75,18 +75,18 @@ def download(client):
             if ('4K' in item_max_quality) or ('2160P' in item_max_quality):
                 if (width <= 1920) and (height <= 1920):
                     raise DownloadError('分辨率不达标', -3)
-            if '1080P60' in item_max_quality:
-                if ((width <= 1080) and (height <= 1080)) or (fps < 50):
-                    raise DownloadError('分辨率不达标', -3)
-            if '1080P+' in item_max_quality:
-                if ((width <= 1080) and (height <= 1080)) or (bitrate < 2000e3):
-                    raise DownloadError('分辨率不达标', -3)
+            # if '1080P60' in item_max_quality:
+            #     if ((width <= 1080) and (height <= 1080)) or (fps < 50):
+            #         raise DownloadError('分辨率不达标', -3)
+            # if '1080P+' in item_max_quality:
+            #     if ((width <= 1080) and (height <= 1080)) or (bitrate < 2000e3):
+            #         raise DownloadError('分辨率不达标', -3)
             if '1080P' in item_max_quality:
                 if (width <= 1080) and (height <= 1080):
                     raise DownloadError('分辨率不达标', -3)
 
             # 下载文件检验成功
-            switch_dl_status(item_vid, DSTATUS.LOCAL, item, {"fid": fid, "cover_fid": cover_fid})
+            switch_dl_status(item_vid, DSTATUS.LOCAL, item, {"fid": fid})
             logger.info(f'下载成功[云盘]：{item_title} {item_vid}')
         except DownloadError as err:
             if err.code == -3:
