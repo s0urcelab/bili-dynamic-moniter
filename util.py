@@ -77,8 +77,9 @@ def find_and_remove(item, client189=None):
         # 视频本体
         client189.delete(item['fid'], f'{item["vid"]}.mp4')
         # 视频封面
-        client189.delete(item['cover_fid'], f'{item["vid"]}.jpg')
-        client189.delete(item['cover_fid'], f'{item["vid"]}.png')
+        if (item.get('cover_fid')):
+            client189.delete(item['cover_fid'], f'{item["vid"]}.jpg')
+            client189.delete(item['cover_fid'], f'{item["vid"]}.png')
         return
     for i in get_frag_path(item):
         os.remove(i)
