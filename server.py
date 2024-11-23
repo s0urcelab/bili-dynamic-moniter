@@ -396,10 +396,14 @@ def folder_size():
     # wait_count = g.dynamic_list.count_documents({"ustatus": USTATUS.SELECTED})
     # up_count = g.dynamic_list.count_documents({"ustatus": USTATUS.UPLOADED})
     
+    cloud_disk = app.client189.get_user_info()
+    used_size = cloud_disk["capacity"] - cloud_disk["available"]
+    
     return {
         'code': 0,
         'data': {
-            'size': f'{get_dir_size()}GB',
+            'local_size': f'{get_dir_size()}GB',
+            'cloud_size': f'{round(used_size / (1024 ** 4), 2)}TB',
             # 'waiting': wait_count,
             # 'uploaded': up_count,
             'is_bg_task_running': app.start_event.is_set(),
