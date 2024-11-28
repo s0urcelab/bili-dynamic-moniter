@@ -144,28 +144,27 @@ def add_attach(item):
     return ritem
 
 def parseBV(bvid, p = 1):
+    max_quality = '未知'
     res_view = requests.get(VIDEO_VIEW_API(bvid), headers={"user-agent": FAKE_USER_AGENT})
     res_json = json.loads(res_view.text)
     if res_json['code'] != 0:
-        raise Exception(f'解析bvid失败')
+        raise Exception(f'解析bvid失败:web_interface')
     
-    res_detail = requests.get(VIDEO_DETAIL_API(bvid, p), headers={"user-agent": FAKE_USER_AGENT})
-    max_quality = ''
-    try:
-        play_info = re.search(r'<script>window.__playinfo__=([^<]+)</script>', res_detail.text)
-        pinfo = json.loads(play_info.group(1))
-    except:
-        max_quality = '未知'
-    else:
-        max_quality = pinfo['data']['accept_description'][0]
-
     curr_page = res_json['data']['pages'][p - 1]
+    cid = curr_page['cid']
+    
+    playurl = requests.get(VIDEO_PLAYURL_API(bvid, cid), headers={"user-agent": FAKE_USER_AGENT, "referer": FAKE_REFERER})
+    playurl_json = json.loads(playurl.text)
+    if playurl_json['code'] != 0:
+        raise Exception(f'解析bvid失败:playurl_api')
+    
+    max_quality = playurl_json['data']['accept_description'][0]
+    
     title = res_json['data']['title']
     pdate = int(time.time())
     pdstr = datetime.fromtimestamp(pdate).strftime("%Y-%m-%d %H:%M:%S")
     desc = res_json['data']['desc']
     cover = res_json['data']['pic']
-    cid = curr_page['cid']
     p_title = curr_page['part']
     duration = curr_page['duration']
     mm, ss = divmod(duration, 60)

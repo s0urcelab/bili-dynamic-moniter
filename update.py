@@ -28,20 +28,28 @@ def update(client):
         bvid = item['vid']
         res = requests.get(VIDEO_DETAIL_API(bvid), headers={"user-agent": FAKE_USER_AGENT})
         try:
-            play_info = re.search(r'<script>window.__playinfo__=([^<]+)</script>', res.text)
+            play_info = re.search(r'<script>window.__INITIAL_STATE__=([^;]+);', res.text)
             pinfo = json.loads(play_info.group(1))
-            # "accept_description":["超清 4K","高清 1080P+","高清 1080P","高清 720P","清晰 480P","流畅 360P"]
-            max_quality = pinfo['data']['accept_description'][0]
-            vwidth = pinfo['data']['dash']['video'][0]['width']
-            vheight = pinfo['data']['dash']['video'][0]['height']
+            cid = pinfo['cid']
+            is_paid = pinfo['elecFullInfo']['show_info']['high_level']['privilege_type']
+            vwidth = pinfo['videoData']['dimension']['width']
+            vheight = pinfo['videoData']['dimension']['height']
             is_portrait = 1 if (vwidth / vheight < 1) else 0
-            duration = round(pinfo['data']['timelength'] / 1000)
         except:
-            logger.error(f'获取 {bvid} 视频详情失败')
-            # 直接失败处理
+            logger.error(f'获取 {bvid} 视频详情失败:web_page')
             return {'dstatus': -9}
-
         else:
+            if is_paid > 0:
+                return {'dstatus': -11}
+            
+            playurl = requests.get(VIDEO_PLAYURL_API(bvid, cid), headers={"user-agent": FAKE_USER_AGENT, "referer": FAKE_REFERER})
+            playurl_json = json.loads(playurl.text)
+            if playurl_json['code'] != 0:
+                logger.error(f'获取 {bvid} 视频详情失败:playurl_api')
+                return {'dstatus': -9}
+            
+            max_quality = playurl_json['data']['accept_description'][0]
+            duration = round(playurl_json['data']['timelength'] / 1000)
             return {'max_quality': max_quality, 'is_portrait': is_portrait, 'duration': duration}
 
     def fetch_dynamic(page, offset): 

@@ -108,7 +108,7 @@ def download(client):
     # 未下载
     q2 = {"$and": [{"duration": {"$lt": 600}}, {"duration": {"$gt": 20}}, {"dstatus": DSTATUS.DEFAULT}]}
     # 下载失败 && 可重试
-    q3 = {"$and": [{"duration": {"$lt": 600}}, {"duration": {"$gt": 20}}, {"dstatus": {"$lt": DSTATUS.DEFAULT}}, {"dstatus": {"$ne": -9}}, {"dl_retry": {"$lt": 3}}]}
+    q3 = {"$and": [{"duration": {"$lt": 600}}, {"duration": {"$gt": 20}}, {"dstatus": {"$lt": DSTATUS.DEFAULT}}, {"dstatus": {"$ne": -11}}, {"dstatus": {"$ne": -9}}, {"dl_retry": {"$lt": 3}}]}
 
     sel_list = dynamic_list.find(qs, {"_id": 0}).sort([("pdate", -1)])
     ing_list = dynamic_list.find(q1, {"_id": 0}).sort([("pdate", -1)])
