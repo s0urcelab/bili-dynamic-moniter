@@ -28,7 +28,7 @@ def update(client):
         bvid = item['vid']
         res = requests.get(VIDEO_DETAIL_API(bvid), headers={"user-agent": FAKE_USER_AGENT})
         try:
-            play_info = re.search(r'<script>window.__INITIAL_STATE__=([^;]+);', res.text)
+            play_info = re.search(r'<script>window.__INITIAL_STATE__=(.+);\(function\(\)', res.text)
             pinfo = json.loads(play_info.group(1))
             cid = pinfo['cid']
             is_paid = pinfo['elecFullInfo']['show_info']['high_level']['privilege_type']
