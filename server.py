@@ -23,7 +23,8 @@ from flask_jwt_extended import unset_jwt_cookies
             
 app = Flask(__name__)
 
-app.client189 = Cloud189Client(username=CLOUD189_USERNAME, password=CLOUD189_PASSWORD)
+# app.client189 = Cloud189Client(username=CLOUD189_USERNAME, password=CLOUD189_PASSWORD)
+app.client189 = Cloud189Client(cookies=CLOUD189_COOKIES)
 app.start_event = threading.Event()
 app.err_msg = ''
 app.err_item = ''
