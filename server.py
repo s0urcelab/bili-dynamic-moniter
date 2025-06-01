@@ -11,7 +11,7 @@ from constant import *
 from util import find_and_remove, get_mp4_path, get_cover_path
 from flask import Flask, g, request, jsonify
 from pymongo import MongoClient
-from cloud189.client import Cloud189Client
+from cloud189 import Cloud189
 
 from flask_jwt_extended import create_access_token
 from flask_jwt_extended import get_jwt
@@ -23,8 +23,12 @@ from flask_jwt_extended import unset_jwt_cookies
             
 app = Flask(__name__)
 
-# app.client189 = Cloud189Client(username=CLOUD189_USERNAME, password=CLOUD189_PASSWORD)
-app.client189 = Cloud189Client(cookies=CLOUD189_COOKIES)
+app.client189 = Cloud189({
+    'username': CLOUD189_USERNAME,
+    'password': CLOUD189_PASSWORD
+})
+# app.client189 = {}
+# app.client189 = Cloud189(cookies=CLOUD189_COOKIES)
 app.start_event = threading.Event()
 app.err_msg = ''
 app.err_item = ''
@@ -396,14 +400,15 @@ def folder_size():
     # wait_count = g.dynamic_list.count_documents({"ustatus": USTATUS.SELECTED})
     # up_count = g.dynamic_list.count_documents({"ustatus": USTATUS.UPLOADED})
     
-    cloud_disk = app.client189.get_user_info()
-    used_size = cloud_disk["capacity"] - cloud_disk["available"]
+    cloud_disk = app.client189.get_disk_space_info()
+    used_size = cloud_disk["cloudCapacityInfo"]["usedSize"]
+    total_size = cloud_disk["cloudCapacityInfo"]["totalSize"]
     
     return {
         'code': 0,
         'data': {
             'local_size': f'{get_dir_size()}GB',
-            'cloud_size': f'{round(used_size / (1024 ** 4), 2)}TB',
+            'cloud_size': f'{round(used_size / (1024 ** 4), 2)} / {round(total_size / (1024 ** 4), 2)}TB',
             # 'waiting': wait_count,
             # 'uploaded': up_count,
             'is_bg_task_running': app.start_event.is_set(),

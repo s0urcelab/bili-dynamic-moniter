@@ -4,7 +4,7 @@ import logging
 from constant import *
 from util import get_mp4_path, get_video_resolution, find_and_remove, legal_title, get_dl_url, get_cover_path
 from yt_dlp import YoutubeDL
-from cloud189.client import Cloud189Client
+from cloud189 import Cloud189
 
 logger = logging.getLogger('bdm')
 
@@ -18,8 +18,11 @@ class DownloadError(Exception):
 
 def download(client):
     dynamic_list = client.dance.dynamic_list
-    # client189 = Cloud189Client(username=CLOUD189_USERNAME, password=CLOUD189_PASSWORD)
-    client189 = Cloud189Client(cookies=CLOUD189_COOKIES)
+    client189 = Cloud189({
+        'username': CLOUD189_USERNAME,
+        'password': CLOUD189_PASSWORD
+    })
+    # client189 = Cloud189(cookies=CLOUD189_COOKIES)
 
     # 切换投稿下载状态
     def switch_dl_status(vid, status, item=None, add=None):
