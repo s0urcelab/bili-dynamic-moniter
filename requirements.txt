@@ -6,7 +6,7 @@ requests<3
 apscheduler==3.10.0
 shazamio==0.3.1.1
 python-dotenv==1.0.0
-yt-dlp==2024.12.03
+yt-dlp==2025.05.22
 pymongo==4.5.0
 flask_jwt_extended==4.6.0
 cloud189>=0.1.4
