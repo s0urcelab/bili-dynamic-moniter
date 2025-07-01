@@ -400,15 +400,20 @@ def folder_size():
     # wait_count = g.dynamic_list.count_documents({"ustatus": USTATUS.SELECTED})
     # up_count = g.dynamic_list.count_documents({"ustatus": USTATUS.UPLOADED})
     
-    cloud_disk = app.client189.get_disk_space_info()
-    used_size = cloud_disk["cloudCapacityInfo"]["usedSize"]
-    total_size = cloud_disk["cloudCapacityInfo"]["totalSize"]
+    cloud_size = ''
+    try:
+        cloud_disk = app.client189.get_disk_space_info()
+        used_size = cloud_disk["cloudCapacityInfo"]["usedSize"]
+        total_size = cloud_disk["cloudCapacityInfo"]["totalSize"]
+        cloud_size = f'{round(used_size / (1024 ** 4), 2)} / {round(total_size / (1024 ** 4), 2)}TB'
+    except:
+        cloud_size = '未知'
     
     return {
         'code': 0,
         'data': {
             'local_size': f'{get_dir_size()}GB',
-            'cloud_size': f'{round(used_size / (1024 ** 4), 2)} / {round(total_size / (1024 ** 4), 2)}TB',
+            'cloud_size': cloud_size,
             # 'waiting': wait_count,
             # 'uploaded': up_count,
             'is_bg_task_running': app.start_event.is_set(),
@@ -533,12 +538,11 @@ def add_vid():
     
 @app.route('/api/find.local', methods=['POST'])
 def find_local():
-    item = request.json
-    if 'fid' in item and item['fid']:
-        play_url = app.client189.get_play_url(item['fid'])
-        return {'code': 0, 'data': play_url}
-    
     try:
+        item = request.json
+        if 'fid' in item and item['fid']:
+            play_url = app.client189.get_play_url(item['fid'])
+            return {'code': 0, 'data': play_url}
         local = get_mp4_path(item)
         if local:
             linux_path = local[0]
