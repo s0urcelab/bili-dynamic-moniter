@@ -347,7 +347,7 @@ def dyn_list():
         qre = {'$regex': regex, '$options': 'i'}
         u_res = g.up_list.find({'uname': qre}, {'_id': 0})
         sz_list = list(map(lambda i: i['id'], g.shazam_list.find({'title': qre}, {'_id': 0})))
-        dq = {"$and": [{'$or': [{'shazam_id': {'$in': sz_list}}, {'title': qre}, {'etitle': qre}]}]}
+        dq = {"$and": [{'$or': [{'vid': keyword}, {'shazam_id': {'$in': sz_list}}, {'title': qre}, {'etitle': qre}]}]}
         d_res = g.dynamic_list.find(dq, {'_id': 0}).sort([("pdate", -1)]).limit(size).skip((page - 1) * size)
         total = g.dynamic_list.count_documents(dq)
         
