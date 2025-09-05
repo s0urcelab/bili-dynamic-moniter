@@ -111,10 +111,12 @@ def update(client):
         flist = []
         page = 1
         content_len = -1
+        retry = 0
 
-        while (content_len != 0):
+        while (content_len != 0 and retry < 3):
             page_list = fetch_follow(page)
             if page_list == None:
+                retry = retry + 1
                 continue
             content_len = len(page_list)
             flist.extend(page_list)
