@@ -454,6 +454,19 @@ def reset_upload():
 
     return {'code': 0, 'data': f'重置上传状态成功'}
 
+# 重定向UP主
+@app.route('/api/redirect.uid', methods=['POST'])
+@jwt_required()
+def redirect_uid():
+    js = request.json
+    vid = js['vid']
+    uid = js['uid']
+    uname = js['uname']
+    
+    g.dynamic_list.update_one({"vid": vid}, {"$set": {"uid": uid, "uname": uname}})
+
+    return {'code': 0, 'data': f'重定向UP主成功'}
+
 # 修改推测bgm标题
 @app.route('/api/edit.title', methods=['POST'])
 @jwt_required()

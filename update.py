@@ -135,7 +135,7 @@ def update(client):
             flist.extend(page_list)
             page = page + 1
             
-        sslist = fetch_special_follow(page)
+        sslist = fetch_special_follow()
 
         follow_list = list(map(lambda i:  i['mid'], flist))
         special_list = list(map(lambda i:  i['mid'], sslist))
