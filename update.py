@@ -15,7 +15,7 @@ def update(client):
 
     def fetch_follow(page): 
         cookie = {'SESSDATA': DYNAMIC_COOKIE}
-        res = requests.get(USER_FOLLOW_API(page), cookies=cookie, headers={"user-agent": FAKE_USER_AGENT})
+        res = requests.get(USER_FOLLOW_API('37444368', page), cookies=cookie, headers={"user-agent": FAKE_USER_AGENT})
         res_json = json.loads(res.text)
 
         if res_json['code'] != 0:
@@ -23,8 +23,18 @@ def update(client):
             return None
             # raise Exception('获取关注列表失败，终止执行')
         return res_json['data']
+    
+    def fetch_special_follow(): 
+        cookie = {'SESSDATA': DYNAMIC_COOKIE}
+        res = requests.get(USER_FOLLOW_API('-10', 1), cookies=cookie, headers={"user-agent": FAKE_USER_AGENT})
+        res_json = json.loads(res.text)
 
-    def fetch_detail(item):
+        if res_json['code'] != 0:
+            logger.error(f'获取特别关注列表失败')
+            return []
+        return res_json['data']
+
+    def fetch_detail(item, special_list):
         bvid = item['vid']
         res = requests.get(VIDEO_DETAIL_API(bvid), headers={"user-agent": FAKE_USER_AGENT})
         try:
@@ -50,7 +60,10 @@ def update(client):
             
             max_quality = playurl_json['data']['accept_description'][0]
             duration = round(playurl_json['data']['timelength'] / 1000)
-            return {'max_quality': max_quality, 'is_portrait': is_portrait, 'duration': duration}
+            
+            # 特别关注用户的视频直接设为精选
+            ustatus = item['uid'] in special_list and USTATUS.SELECTED or USTATUS.DEFAULT
+            return {'max_quality': max_quality, 'is_portrait': is_portrait, 'duration': duration, 'ustatus': ustatus}
 
     def fetch_dynamic(page, offset): 
         cookie = {'SESSDATA': DYNAMIC_COOKIE}
@@ -121,11 +134,15 @@ def update(client):
             content_len = len(page_list)
             flist.extend(page_list)
             page = page + 1
+            
+        sslist = fetch_special_follow(page)
 
         follow_list = list(map(lambda i:  i['mid'], flist))
+        special_list = list(map(lambda i:  i['mid'], sslist))
         user_list = list(map(lambda i: {"uid": i['mid'], "uname": i['uname'], "avatar": i['face'], "sign": i['sign']}, flist))
         # 存入数据库
         config.update_one({"follow_list": {"$exists": True}}, {"$set": {"follow_list": follow_list}}, upsert=True)
+        config.update_one({"special_follow_list": {"$exists": True}}, {"$set": {"special_follow_list": special_list}}, upsert=True)
         try:
             up_list.insert_many(user_list, ordered=False)
         except:
@@ -137,14 +154,14 @@ def update(client):
         #         up_list.delete_one({"uid": user['uid']})
         # total_user = up_list.count_documents({})
         logger.info(f'关注分组已更新，当前共关注 {len(follow_list)} 用户')
-        return follow_list
+        return follow_list, special_list
 
     """
     获取截止时间 check_point 前的所有关注用户 follow_list 的动态
     """
     logger.info('定时任务：获取最新动态')
     cpdate = config.find_one({"check_point": {"$exists": True}})['check_point']
-    follow_list = refresh_follow()
+    follow_list, special_list = refresh_follow()
     flist = []
     page = 1
     offset = ''
@@ -167,7 +184,7 @@ def update(client):
 
     filter_list = list(filter(lambda i: i['uid'] in follow_list, flist))
 
-    add_vinfo = lambda item: {**item, **fetch_detail(item)}
+    add_vinfo = lambda item: {**item, **fetch_detail(item, special_list)}
     d = [add_vinfo(v) for v in filter_list]
     
     # 没有更新直接退出

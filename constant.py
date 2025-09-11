@@ -17,7 +17,7 @@ CLOUD189_TARGET_FOLDER_ID = os.environ['CLOUD189_TARGET_FOLDER_ID']
 CLOUD189_COOKIES = os.environ['CLOUD189_COOKIES']
 
 USER_DYNAMIC_API = lambda page,offset: f'https://api.bilibili.com/x/polymer/web-dynamic/v1/feed/all?timezone_offset=-480&type=video&page={page}&features=itemOpusStyle&offset={offset}'
-USER_FOLLOW_API = lambda page: f'https://api.bilibili.com/x/relation/tag?mid=543741&tagid=37444368&pn={page}&ps=20'
+USER_FOLLOW_API = lambda tid, page: f'https://api.bilibili.com/x/relation/tag?mid=543741&tagid={tid}&pn={page}&ps=30'
 VIDEO_DETAIL_API = lambda bvid, p=1: f'https://www.bilibili.com/video/{bvid}?p={p}'
 VIDEO_VIEW_API = lambda bvid: f'https://api.bilibili.com/x/web-interface/view?bvid={bvid}'
 VIDEO_PLAYURL_API = lambda bvid, cid: f'https://api.bilibili.com/x/player/wbi/playurl?fnval=4048&bvid={bvid}&cid={cid}'
