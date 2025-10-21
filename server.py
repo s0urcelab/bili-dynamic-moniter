@@ -288,6 +288,9 @@ def explore_list():
 @app.route('/api/video.detail/<vid>')
 def video_detail(vid):
     detail = g.dynamic_list.find_one({"vid": vid}, {"_id": 0})
+    if not detail:
+        return '视频不存在', 404
+    
     q = {"$and": [{"uid": detail['uid']}, {"vid": { "$ne": vid }}, {"ustatus": {"$gt": USTATUS.DEFAULT}}]}
     q_list = g.dynamic_list.find(q, {"_id": 0}).limit(6)
     more_list = list(map(add_attach, q_list))
