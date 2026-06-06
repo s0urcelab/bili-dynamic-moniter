@@ -1,3 +1,4 @@
+setuptools<82
 gunicorn==23.0.0
 gevent==25.5.1
 flask==2.2.5

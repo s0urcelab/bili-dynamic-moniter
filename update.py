@@ -79,7 +79,7 @@ def update(client):
             uid = item['modules']['module_author']['mid']
             uname = item['modules']['module_author']['name']
             avatar = item['modules']['module_author']['face']
-            pdate = item['modules']['module_author']['pub_ts']
+            pdate = int(item['modules']['module_author']['pub_ts'])
             pdstr = datetime.fromtimestamp(pdate).strftime("%Y-%m-%d %H:%M:%S")
             title = item['modules']['module_dynamic']['major']['archive']['title']
             bvid = item['modules']['module_dynamic']['major']['archive']['bvid']
