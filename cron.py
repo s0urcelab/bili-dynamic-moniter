@@ -22,12 +22,22 @@ async def main():
     await shazam_match(client)
     
     client.close()
-
-if __name__ == '__main__':
+    
+# 新增一个异步的启动入口
+async def run_scheduler():
     scheduler = AsyncIOScheduler(timezone='Asia/Shanghai')
     scheduler.add_job(main, 'interval', minutes=15)
+    
     def self_restart(event):
         subprocess.run(["docker", "restart", "bdm-downloader"])
+        
     scheduler.add_listener(self_restart, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
+    
+    # 此时事件循环正在运行，可以安全地启动调度器
     scheduler.start()
-    asyncio.get_event_loop().run_forever()
+    
+    # 阻塞该协程以保持事件循环持续运转
+    await asyncio.Event().wait()
+
+if __name__ == '__main__':
+    asyncio.run(run_scheduler())
