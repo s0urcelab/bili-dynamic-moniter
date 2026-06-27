@@ -16,6 +16,11 @@ def replace_illegal(s: str):
 def legal_title(*parts: str, join_str: str = '-'):
     return join_str.join(filter(lambda x: len(x) > 0, map(replace_illegal, parts)))
 
+def cut_title(title: str) -> str:
+    if len(title) > 60:
+        title = title[:60 - 3] + '...'
+    return title
+
 """
 from_local  => source: hash 本地手动下载，标题-bvid-hash.mp4
 none        => source: 0 bilix下载，标题.mp4

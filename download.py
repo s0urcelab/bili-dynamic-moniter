@@ -2,7 +2,7 @@
 import os
 import logging
 from constant import *
-from util import get_mp4_path, get_video_resolution, find_and_remove, legal_title, get_dl_url, get_cover_path
+from util import get_mp4_path, get_video_resolution, find_and_remove, legal_title, get_dl_url, cut_title, get_cover_path
 from yt_dlp import YoutubeDL
 from cloud189 import Cloud189
 
@@ -48,7 +48,7 @@ def download(client):
                 logger.error(msg)
 
         ydl_opts = {
-            'outtmpl': os.path.join(MEDIA_ROOT, f'{legal_title(item_title)}-{item_vid}.%(ext)s'),
+            'outtmpl': os.path.join(MEDIA_ROOT, f'{cut_title(legal_title(item_title))}-{item_vid}.%(ext)s'),
             'writethumbnail': True,
             'cookiefile': DL_COOKIE_FILE,
             'format_sort': ['size'],
