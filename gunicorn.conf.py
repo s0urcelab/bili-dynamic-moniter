@@ -1,9 +1,13 @@
-# 定义同时开启的处理请求的进程数量，根据网站流量适当调整
-workers = 1
-# 采用gevent库，支持异步处理请求，提高吞吐量
-worker_class = "gevent"
-# 防止多个worker多次执行定时任务
-# preload_app = True
+import os
 
-# 绑定IP/端口
-bind = "0.0.0.0:7002"
+wsgi_app = 'wsgi:app'
+bind = os.environ.get('API_BIND', '0.0.0.0:7002')
+# 后台任务已全部移到 worker，API 进程无状态，可以按需增加 worker 数
+workers = int(os.environ.get('API_WORKERS', 2))
+worker_class = 'gevent'
+timeout = 60
+accesslog = '-'
+errorlog = '-'
+# 兜底：即使有泄漏，每个 worker 处理一定请求后也会被平滑替换
+max_requests = 2000
+max_requests_jitter = 200

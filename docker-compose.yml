@@ -1,0 +1,22 @@
+x-common: &common
+  image: s0urce1911/rcc:latest
+  env_file: .env
+  restart: unless-stopped
+  volumes:
+    - ${MEDIA_HOST_DIR:-./media}:/media
+    # cookie 推荐在管理后台配置；仍想用文件时取消注释，并设置 DL_COOKIE_FILE=/app/cookies.txt
+    # - ./cookies.txt:/app/cookies.txt
+
+services:
+  api:
+    <<: *common
+    container_name: bdm-api
+    ports:
+      - "7002:7002"
+
+  worker:
+    <<: *common
+    container_name: bdm-worker
+    command: ["python", "-m", "bdm.worker"]
+    # tini 作为 PID 1，保证 docker stop 时信号能正确送达调度进程
+    init: true
