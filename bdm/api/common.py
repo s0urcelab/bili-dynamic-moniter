@@ -1,20 +1,21 @@
 import logging
-import re
 from datetime import date, datetime
 
-from bson import ObjectId
 from flask import jsonify, request
 from flask.json.provider import DefaultJSONProvider
 
 from bdm import cloud, db, media
-from bdm.status import DSTATUS_LABELS, DStatus, ShazamStatus, UStatus
+from bdm.status import DSTATUS_LABELS, ShazamStatus, UStatus
 
 logger = logging.getLogger(__name__)
 
 MAX_BATCH = 500
 
-# 前台可见：精选且本地
-PUBLISHED = {'ustatus': {'$gt': UStatus.DEFAULT}, 'dstatus': {'$gte': DStatus.LOCAL}}
+# 前台可见：精选且本地/云盘
+PUBLISHED = db.PUBLISHED
+
+# BGM 曲目标题包含关键词，参数为关键词
+SONG_MATCHES = 'song_id IN (SELECT id FROM songs WHERE icontains(title, ?))'
 
 
 class ApiError(Exception):
@@ -32,8 +33,6 @@ class JSONProvider(DefaultJSONProvider):
     def default(o):
         if isinstance(o, (datetime, date)):
             return o.isoformat()
-        if isinstance(o, ObjectId):
-            return str(o)
         return DefaultJSONProvider.default(o)
 
 
@@ -76,30 +75,32 @@ def int_arg(name, default=None, minimum=None, maximum=None):
     return value
 
 
-def keyword_regex(keyword):
-    return {'$regex': re.escape(keyword), '$options': 'i'}
-
-
 def is_song_id(shazam_id):
     return shazam_id not in (ShazamStatus.PENDING, ShazamStatus.NO_MATCH, ShazamStatus.NO_FILE,
                              ShazamStatus.ERROR, None)
 
 
-def song_ids_matching(regex):
-    return [s['id'] for s in db.songs().find({'title': regex}, {'id': 1})]
+def ups_by_uid(uids):
+    uids = list(uids)
+    if not uids:
+        return {}
+    return {u['uid']: u for u in db.query(f'SELECT * FROM ups WHERE uid IN ({db.marks(uids)})', uids)}
+
+
+def search_ups(keyword, limit=20):
+    return db.query('SELECT * FROM ups WHERE icontains(uname, ?) LIMIT ?', (keyword, limit))
 
 
 def attach(items):
     """批量补充 BGM 标题与 UP 主信息。"""
     items = list(items)
     song_ids = list({i['shazam_id'] for i in items if is_song_id(i.get('shazam_id'))})
-    uids = list({i['uid'] for i in items if i.get('uid') is not None})
-    songs = {s['id']: s['title'] for s in db.songs().find({'id': {'$in': song_ids}})} if song_ids else {}
-    ups = {u['uid']: u for u in db.ups().find({'uid': {'$in': uids}}, {'_id': 0})} if uids else {}
+    songs = {s['id']: s['title'] for s in db.query(
+        f'SELECT id, title FROM songs WHERE id IN ({db.marks(song_ids)})', song_ids)} if song_ids else {}
+    ups = ups_by_uid({i['uid'] for i in items if i.get('uid') is not None})
 
     result = []
     for item in items:
-        item = {k: v for k, v in item.items() if k != '_id'}
         up = ups.get(item.get('uid'))
         item['bgm_title'] = songs.get(item.get('shazam_id')) or item.get('etitle')
         item['up'] = {
@@ -114,10 +115,11 @@ def attach(items):
     return result
 
 
-def paginate(query, page, size, sort=('pdate', -1)):
-    total = db.videos().count_documents(query)
-    cursor = db.videos().find(query, {'_id': 0}).sort(*sort).skip((page - 1) * size).limit(size)
-    return {'items': attach(cursor), 'total': total, 'page': page, 'size': size}
+def paginate(where, params, page, size):
+    """按发布时间倒序分页。"""
+    total = db.count_videos(where, params)
+    items = db.find_videos(where, params, limit=size, offset=(page - 1) * size)
+    return {'items': attach(items), 'total': total, 'page': page, 'size': size}
 
 
 def page_args(default_size, max_size):

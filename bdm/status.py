@@ -1,5 +1,5 @@
 """
-稿件在 dynamic_list 中的状态字段。数值与历史数据保持一致，不要修改已有取值。
+稿件的状态字段。数值与历史数据保持一致，不要修改已有取值。
 
 下载流水线（dstatus）：
     PENDING ──download──> DOWNLOADING ──> LOCAL ──upload + match 均完成──> CLOUD

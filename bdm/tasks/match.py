@@ -14,8 +14,7 @@ STAGE = 'match'
 
 
 def candidates(limit):
-    q = {'shazam_id': ShazamStatus.PENDING, 'dstatus': DStatus.LOCAL}
-    return list(db.videos().find(q, {'_id': 0}).sort('pdate', -1).limit(limit))
+    return db.find_videos(f'bgm_status = {ShazamStatus.PENDING} AND dstatus = {DStatus.LOCAL}', limit=limit)
 
 
 async def recognize(shazam, path):
@@ -47,10 +46,12 @@ async def match_all(items):
                 logger.exception('Shazam 识别异常：%s', vid)
                 state.report_error(STAGE, f'{type(err).__name__}: {err}', f'[{vid}] {item["title"]}')
 
-        db.videos().update_one({'vid': vid}, {'$set': {'shazam_id': shazam_id}})
+        if shazam_id not in (ShazamStatus.NO_MATCH, ShazamStatus.NO_FILE, ShazamStatus.ERROR):
+            # 稿件通过外键引用曲目，曲目要先写入；已存在的曲目保留后台手动修改过的标题
+            db.execute('INSERT INTO songs (id, title) VALUES (?, ?) ON CONFLICT (id) DO NOTHING',
+                       (str(shazam_id), title or ''))
+        db.update_videos('vid = ?', (vid,), set={'shazam_id': shazam_id})
         if title:
-            # 已存在的曲目保留后台手动修改过的标题
-            db.songs().update_one({'id': shazam_id}, {'$setOnInsert': {'title': title}}, upsert=True)
             counts['matched'] += 1
         elif shazam_id == ShazamStatus.NO_MATCH:
             counts['no_match'] += 1

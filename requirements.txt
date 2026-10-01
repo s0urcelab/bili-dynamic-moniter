@@ -4,7 +4,6 @@ flask==3.0.3
 flask_jwt_extended==4.6.0
 requests>=2.31,<3
 apscheduler>=3.11,<4
-pymongo>=4.5,<5
 python-dotenv==1.0.0
 tzdata
 yt-dlp>=2025.5.22

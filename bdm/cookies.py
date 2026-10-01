@@ -186,8 +186,7 @@ def save(kind, text):
 
 
 def clear(kind):
-    db.settings().delete_many({_setting_key(kind): {'$exists': True}})
-    db.settings().delete_many({_check_key(kind): {'$exists': True}})
+    db.delete_settings(_setting_key(kind), _check_key(kind))
 
 
 def check(kind):

@@ -5,7 +5,7 @@ from flask import Flask
 from flask_jwt_extended import JWTManager, create_access_token, get_jwt, get_jwt_identity, set_access_cookies
 from werkzeug.exceptions import HTTPException
 
-from bdm import config
+from bdm import config, db
 from bdm.api import admin_system, admin_videos, auth, public
 from bdm.api.common import ApiError, JSONProvider, fail
 from bdm.logs import setup_logging
@@ -64,11 +64,14 @@ def _setup_errors(app):
 
 
 def create_app():
-    config.require('JWT_SECRET_KEY', 'MANAGE_PASSWORD', 'MONGODB_URL')
+    config.require('JWT_SECRET_KEY', 'MANAGE_PASSWORD')
     setup_logging()
+    db.init()
+    db.close()
 
     app = Flask(__name__, static_folder=None)
     app.json = JSONProvider(app)
+    app.teardown_appcontext(lambda exc: db.close())
     _setup_jwt(app)
     _setup_errors(app)
 

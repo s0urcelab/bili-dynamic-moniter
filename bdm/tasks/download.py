@@ -34,27 +34,23 @@ class _YtdlpLogger:
         logger.error(msg)
 
 
-def _not_exhausted(field, limit):
-    return {field: {'$not': {'$gte': limit}}}
-
-
 def candidates(limit):
-    in_range = {'duration': {'$gt': config.DOWNLOAD_MIN_DURATION, '$lt': config.DOWNLOAD_MAX_DURATION}}
-    selected = {'ustatus': {'$gte': UStatus.SELECTED}}
-    requested = {'dl_requested': True}  # 后台手动要求重新下载，不受时长限制
-    retryable = {
-        'dstatus': {'$lt': 0, '$nin': list(DStatus.NON_RETRYABLE)},
-        **_not_exhausted('dl_retry', config.MAX_DOWNLOAD_RETRY),
-    }
+    in_range = 'duration > ? AND duration < ?'
+    in_range_args = (config.DOWNLOAD_MIN_DURATION, config.DOWNLOAD_MAX_DURATION)
+    selected = f'ustatus >= {UStatus.SELECTED}'
+    requested = 'dl_requested = 1'  # 后台手动要求重新下载，不受时长限制
+    non_retryable = ', '.join(str(s) for s in DStatus.NON_RETRYABLE)
+    retryable = f'dstatus < 0 AND dstatus NOT IN ({non_retryable}) AND dl_retry < ?'
     queries = [
-        {'dstatus': DStatus.DOWNLOADING},  # 上一轮被中断
-        {'$or': [selected, requested], 'dstatus': DStatus.PENDING},
-        {**in_range, 'dstatus': DStatus.PENDING},
-        {'$and': [{'$or': [selected, in_range, requested]}, retryable]},
+        (f'dstatus = {DStatus.DOWNLOADING}', ()),  # 上一轮被中断
+        (f'({selected} OR {requested}) AND dstatus = {DStatus.PENDING}', ()),
+        (f'{in_range} AND dstatus = {DStatus.PENDING}', in_range_args),
+        (f'({selected} OR ({in_range}) OR {requested}) AND {retryable}',
+         (*in_range_args, config.MAX_DOWNLOAD_RETRY)),
     ]
     picked, seen = [], set()
-    for q in queries:
-        for item in db.videos().find(q, {'_id': 0}).sort('pdate', -1).limit(limit):
+    for where, params in queries:
+        for item in db.find_videos(where, params, limit=limit):
             if item['vid'] not in seen:
                 seen.add(item['vid'])
                 picked.append(item)
@@ -114,19 +110,18 @@ def existing_version(item):
     return files[0], info
 
 
-def _mark_local(item, info, low_res, extra_set=None, extra_unset=None, inc_retry=False):
-    update = {
-        '$set': {
+def _mark_local(item, info, low_res, extra_set=None, extra_unset=(), inc_retry=False):
+    db.update_videos(
+        'vid = ?', (item['vid'],),
+        set={
             'dstatus': DStatus.LOCAL, 'video_info': info, 'low_res': low_res,
             'downloaded_at': datetime.now(timezone.utc), **(extra_set or {}),
         },
-        '$unset': {**(extra_unset or {}), 'dl_requested': ''},
-    }
-    if inc_retry:
-        update['$inc'] = {'dl_retry': 1}
-    db.videos().update_one({'vid': item['vid']}, update)
-    db.videos().update_one({'vid': item['vid'], 'shazam_id': ShazamStatus.NO_FILE},
-                           {'$set': {'shazam_id': ShazamStatus.PENDING}})
+        unset=[*extra_unset, 'dl_requested'],
+        inc={'dl_retry': 1} if inc_retry else None,
+    )
+    db.update_videos(f'vid = ? AND bgm_status = {ShazamStatus.NO_FILE}', (item['vid'],),
+                     set={'shazam_id': ShazamStatus.PENDING})
     videos.finalize(item['vid'])
 
 
@@ -135,14 +130,14 @@ def _on_downloaded(item, old_path, old_info, new_info, exhausted):
     max_quality = item.get('max_quality')
     replace = old_path is None or quality_ok(max_quality, new_info) or _longest(new_info) >= _longest(old_info)
 
-    fields, unset = {}, {'dl_error': ''}
+    fields, unset = {}, ['dl_error']
     if replace:
         media.promote_incoming(item)
         info = new_info
         # 云盘上的旧版本在新版本上传前删除
         if item.get('fid') or item.get('cover_fid'):
             fields.update({'stale_fid': item.get('fid'), 'stale_cover_fid': item.get('cover_fid')})
-            unset.update({'fid': '', 'cover_fid': ''})
+            unset += ['fid', 'cover_fid']
     else:
         media.discard_incoming(item)
         info = old_info
@@ -151,12 +146,10 @@ def _on_downloaded(item, old_path, old_info, new_info, exhausted):
     low_res = not quality_ok(max_quality, info)
     if low_res and not exhausted:
         message = f'分辨率不达标：{_describe(info)}，稿件最高画质 {max_quality}（已保留本地文件，等待重试）'
-        unset.pop('dl_error')
-        update = {'$set': {**fields, 'dstatus': DStatus.LOW_RES, 'video_info': info, 'dl_error': message},
-                  '$inc': {'dl_retry': 1}}
-        if unset:
-            update['$unset'] = unset
-        db.videos().update_one({'vid': vid}, update)
+        unset.remove('dl_error')
+        db.update_videos('vid = ?', (vid,),
+                         set={**fields, 'dstatus': DStatus.LOW_RES, 'video_info': info, 'dl_error': message},
+                         unset=unset, inc={'dl_retry': 1})
         logger.warning('%s：%s', message, vid)
         return message
 
@@ -176,18 +169,13 @@ def _on_failed(item, code, message, old_path, old_info, exhausted):
         logger.warning('下载失败且重试已用尽，保留本地已有版本：%s', vid)
         return message
     if exhausted and item.get('fid'):
-        db.videos().update_one({'vid': vid}, {
-            '$set': {'dstatus': DStatus.CLOUD, 'dl_error': message[:500]},
-            '$unset': {'dl_requested': ''},
-            '$inc': {'dl_retry': 1},
-        })
+        db.update_videos('vid = ?', (vid,), set={'dstatus': DStatus.CLOUD, 'dl_error': message[:500]},
+                         unset=['dl_requested'], inc={'dl_retry': 1})
         logger.warning('下载失败且重试已用尽，保留云盘已有版本：%s', vid)
         return message
 
-    update = {'$set': {'dstatus': code, 'dl_error': message[:500]}, '$inc': {'dl_retry': 1}}
-    if exhausted:
-        update['$unset'] = {'dl_requested': ''}
-    db.videos().update_one({'vid': vid}, update)
+    db.update_videos('vid = ?', (vid,), set={'dstatus': code, 'dl_error': message[:500]},
+                     unset=['dl_requested'] if exhausted else (), inc={'dl_retry': 1})
     logger.error('下载失败[%s]：%s %s%s', message, item['title'], vid, '（本地已有版本保留）' if old_path else '')
     return message
 
@@ -200,7 +188,7 @@ def download_one(item, cookiefile=None):
     vid = item['vid']
     exhausted = item.get('dl_retry', 0) + 1 >= config.MAX_DOWNLOAD_RETRY
     logger.info('开始下载：%s %s', item['title'], vid)
-    db.videos().update_one({'vid': vid}, {'$set': {'dstatus': DStatus.DOWNLOADING}})
+    db.update_videos('vid = ?', (vid,), set={'dstatus': DStatus.DOWNLOADING})
     media.remove_fragments(item)
     old_path, old_info = existing_version(item)
 

@@ -80,7 +80,7 @@ def poll(scheduler):
 
 def main():
     setup_logging()
-    db.ensure_indexes()
+    db.init()
     state.ensure_all()
     state.reset_running()
 

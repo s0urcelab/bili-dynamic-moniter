@@ -1,5 +1,5 @@
 """
-task_state 集合：worker 与 API 之间共享的任务状态。每个阶段一个文档。
+task_state 表：worker 与 API 之间共享的任务状态。每个阶段一行。
 
     name                  阶段名
     enabled               开关；worker 每轮开始前、处理每个稿件前都会检查
@@ -14,8 +14,6 @@ task_state 集合：worker 与 API 之间共享的任务状态。每个阶段一
 """
 from datetime import datetime, timezone
 
-from pymongo import ReturnDocument
-
 from bdm import db
 
 STAGES = ('fetch', 'download', 'upload', 'match')
@@ -28,6 +26,23 @@ STAGE_LABELS = {
 }
 
 WORKER_HEARTBEAT_KEY = 'worker_heartbeat'
+
+_FIELDS = {
+    'enabled': 'bool',
+    'paused_reason': 'text',
+    'run_requested': 'bool',
+    'running': 'bool',
+    'last_started_at': 'time',
+    'last_finished_at': 'time',
+    'last_status': 'text',
+    'last_summary': 'text',
+    'last_error': 'text',
+    'last_error_item': 'text',
+    'last_error_at': 'time',
+    'error_in_run': 'bool',
+    'consecutive_failures': 'int',
+    'updated_at': 'time',
+}
 
 
 def _now():
@@ -53,23 +68,31 @@ def _defaults(name):
     }
 
 
+def _decode(row):
+    return {'name': row['name'], **{k: db.decode(kind, row[k]) for k, kind in _FIELDS.items()}}
+
+
 def _update(name, fields):
-    db.task_state().update_one({'name': name}, {'$set': {**fields, 'updated_at': _now()}}, upsert=True)
+    cols = {k: db.encode(_FIELDS[k], v) for k, v in {**fields, 'updated_at': _now()}.items()}
+    names = ', '.join(cols)
+    assign = ', '.join(f'{c} = excluded.{c}' for c in cols)
+    db.execute(f'INSERT INTO task_state (name, {names}) VALUES (?, {db.marks(cols)}) '
+               f'ON CONFLICT (name) DO UPDATE SET {assign}', (name, *cols.values()))
 
 
 def ensure_all():
     for name in STAGES:
-        db.task_state().update_one({'name': name}, {'$setOnInsert': _defaults(name)}, upsert=True)
+        db.execute('INSERT INTO task_state (name) VALUES (?) ON CONFLICT (name) DO NOTHING', (name,))
 
 
 def get(name):
-    doc = db.task_state().find_one({'name': name}, {'_id': 0}) or {}
-    return {**_defaults(name), **doc}
+    row = db.query_one('SELECT * FROM task_state WHERE name = ?', (name,))
+    return _decode(row) if row else _defaults(name)
 
 
 def all_states():
-    docs = {d['name']: d for d in db.task_state().find({'name': {'$in': list(STAGES)}}, {'_id': 0})}
-    return [{**_defaults(n), **docs.get(n, {})} for n in STAGES]
+    rows = {r['name']: _decode(r) for r in db.query('SELECT * FROM task_state')}
+    return [rows.get(n) or _defaults(n) for n in STAGES]
 
 
 def is_enabled(name):
@@ -92,13 +115,8 @@ def request_run(name):
 
 
 def pop_run_requests():
-    names = []
-    for doc in db.task_state().find({'run_requested': True}, {'name': 1}):
-        res = db.task_state().update_one({'name': doc['name'], 'run_requested': True},
-                                         {'$set': {'run_requested': False}})
-        if res.modified_count:
-            names.append(doc['name'])
-    return names
+    rows = db.query('UPDATE task_state SET run_requested = 0 WHERE run_requested = 1 RETURNING name')
+    return [r['name'] for r in rows]
 
 
 def mark_started(name):
@@ -110,14 +128,12 @@ def mark_finished(name, status, fallback_error=None):
     _update(name, {'running': False, 'last_finished_at': now, 'last_status': status})
     if fallback_error:
         # 子进程本轮已上报更具体的错误时不覆盖
-        db.task_state().update_one(
-            {'name': name, 'error_in_run': {'$ne': True}},
-            {'$set': {'last_error': fallback_error, 'last_error_item': None, 'last_error_at': now}},
-        )
+        db.execute('UPDATE task_state SET last_error = ?, last_error_item = NULL, last_error_at = ? '
+                   'WHERE name = ? AND error_in_run = 0', (fallback_error, db.to_db_time(now), name))
 
 
 def reset_running():
-    db.task_state().update_many({'running': True}, {'$set': {'running': False}})
+    db.execute('UPDATE task_state SET running = 0 WHERE running = 1')
 
 
 def report_summary(name, summary):
@@ -131,10 +147,11 @@ def report_error(name, error, item=None):
 
 
 def record_item_failure(name):
-    doc = db.task_state().find_one_and_update(
-        {'name': name}, {'$inc': {'consecutive_failures': 1}}, upsert=True, return_document=ReturnDocument.AFTER,
+    return db.scalar(
+        'INSERT INTO task_state (name, consecutive_failures) VALUES (?, 1) '
+        'ON CONFLICT (name) DO UPDATE SET consecutive_failures = consecutive_failures + 1 '
+        'RETURNING consecutive_failures', (name,),
     )
-    return doc['consecutive_failures']
 
 
 def reset_item_failures(name):

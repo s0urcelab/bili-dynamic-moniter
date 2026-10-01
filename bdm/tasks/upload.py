@@ -17,12 +17,8 @@ STAGE = 'upload'
 
 
 def candidates(limit):
-    q = {
-        'dstatus': DStatus.LOCAL,
-        'fid': {'$in': [None, '']},
-        'cloud_retry': {'$not': {'$gte': config.MAX_UPLOAD_RETRY}},
-    }
-    return list(db.videos().find(q, {'_id': 0}).sort('pdate', -1).limit(limit))
+    return db.find_videos(f'dstatus = {DStatus.LOCAL} AND fid IS NULL AND cloud_retry < ?',
+                          (config.MAX_UPLOAD_RETRY,), limit=limit)
 
 
 def upload_one(item):
@@ -31,15 +27,13 @@ def upload_one(item):
     files = media.video_files(item)
     if not files:
         logger.warning('本地文件不存在，退回下载阶段：%s', vid)
-        db.videos().update_one({'vid': vid}, {'$set': {
-            'dstatus': DStatus.FILE_MISSING, 'dl_error': '上传时找不到本地文件',
-        }})
+        db.update_videos('vid = ?', (vid,), set={'dstatus': DStatus.FILE_MISSING, 'dl_error': '上传时找不到本地文件'})
         return False
 
     if item.get('stale_fid') or item.get('stale_cover_fid'):
         # 新版本已在本地，先删除云盘上被替换的旧版本，避免同名冲突
         cloud.delete_files(vid, item.get('stale_fid'), item.get('stale_cover_fid'))
-        db.videos().update_one({'vid': vid}, {'$unset': {'stale_fid': '', 'stale_cover_fid': ''}})
+        db.update_videos('vid = ?', (vid,), unset=['stale_fid', 'stale_cover_fid'])
 
     logger.info('开始上传：%s %s', item['title'], vid)
     fields = {'fid': cloud.upload(files[0], vid), 'uploaded_at': datetime.now(timezone.utc)}
@@ -51,7 +45,7 @@ def upload_one(item):
         except Exception as err:
             logger.warning('封面上传失败 %s：%s', vid, err)
 
-    db.videos().update_one({'vid': vid}, {'$set': fields, '$unset': {'cloud_error': ''}})
+    db.update_videos('vid = ?', (vid,), set=fields, unset=['cloud_error'])
     logger.info('上传成功：%s %s', item['title'], vid)
     videos.finalize(vid)
     return True
@@ -76,10 +70,7 @@ def run():
             cloud.reset()
             message = f'{type(err).__name__}: {err}'
             logger.exception('上传失败：%s', item['vid'])
-            db.videos().update_one({'vid': item['vid']}, {
-                '$set': {'cloud_error': message[:500]},
-                '$inc': {'cloud_retry': 1},
-            })
+            db.update_videos('vid = ?', (item['vid'],), set={'cloud_error': message[:500]}, inc={'cloud_retry': 1})
             state.report_error(STAGE, message, f'[{item["vid"]}] {item["title"]}')
 
             streak = state.record_item_failure(STAGE)

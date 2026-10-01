@@ -35,7 +35,7 @@ def format_ts(ts):
 
 
 def parse_feed_item(item):
-    """把动态流中的一条视频动态转成 dynamic_list 文档的基础字段；非视频动态返回 None。"""
+    """把动态流中的一条视频动态转成稿件的基础字段；非视频动态返回 None。"""
     try:
         author = item['modules']['module_author']
         archive = item['modules']['module_dynamic']['major']['archive']

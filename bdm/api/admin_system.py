@@ -167,16 +167,16 @@ def storage():
 @bp.get('/stats')
 def stats():
     by_status = {
-        doc['_id']: doc['count']
-        for doc in db.videos().aggregate([{'$group': {'_id': '$dstatus', 'count': {'$sum': 1}}}])
+        row['dstatus']: row['count']
+        for row in db.query('SELECT dstatus, COUNT(*) AS count FROM videos GROUP BY dstatus ORDER BY dstatus')
     }
     return ok({
         'total': sum(by_status.values()),
         'by_dstatus': [
             {'dstatus': k, 'label': DSTATUS_LABELS.get(k, '未知'), 'count': v}
-            for k, v in sorted(by_status.items(), key=lambda kv: (kv[0] is None, kv[0]))
+            for k, v in by_status.items()
         ],
-        'selected': db.videos().count_documents({'ustatus': {'$gt': UStatus.DEFAULT}}),
-        'waiting_upload': db.videos().count_documents({'dstatus': DStatus.LOCAL, 'fid': {'$in': [None, '']}}),
-        'waiting_match': db.videos().count_documents({'dstatus': DStatus.LOCAL, 'shazam_id': ShazamStatus.PENDING}),
+        'selected': db.count_videos(f'ustatus > {UStatus.DEFAULT}'),
+        'waiting_upload': db.count_videos(f'dstatus = {DStatus.LOCAL} AND fid IS NULL'),
+        'waiting_match': db.count_videos(f'dstatus = {DStatus.LOCAL} AND bgm_status = {ShazamStatus.PENDING}'),
     })

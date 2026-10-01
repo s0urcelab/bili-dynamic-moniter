@@ -4,6 +4,8 @@ x-common: &common
   restart: unless-stopped
   volumes:
     - ${MEDIA_HOST_DIR:-./media}:/media
+    # SQLite 数据库。api 与 worker 必须挂载同一个本地目录（不要用网络文件系统，WAL 模式依赖共享内存）
+    - ${DATA_HOST_DIR:-./data}:/data
     # cookie 推荐在管理后台配置；仍想用文件时取消注释，并设置 DL_COOKIE_FILE=/app/cookies.txt
     # - ./cookies.txt:/app/cookies.txt
 

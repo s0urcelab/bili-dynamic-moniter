@@ -32,8 +32,7 @@ TZ = ZoneInfo(_str('TZ', 'Asia/Shanghai'))
 LOG_LEVEL = _str('LOG_LEVEL', 'INFO')
 
 # 存储
-MONGODB_URL = _str('MONGODB_URL')
-MONGODB_DB = _str('MONGODB_DB', 'dance')
+DB_PATH = _str('DB_PATH', '/data/bdm.db')
 MEDIA_ROOT = _str('MEDIA_ROOT', '/media')
 LOCAL_FILE_URL_PREFIX = _str('LOCAL_FILE_URL_PREFIX')
 

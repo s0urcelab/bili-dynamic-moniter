@@ -2,9 +2,6 @@
 import logging
 import time
 
-from pymongo import UpdateOne
-from pymongo.errors import BulkWriteError
-
 from bdm import config, cookies, db, videos
 from bdm.bilibili import SPECIAL_FOLLOW_TAG_ID, BiliAuthError, BiliClient, format_ts, parse_feed_item
 
@@ -25,13 +22,12 @@ def refresh_follow(bili):
     else:
         follow = [m['mid'] for m in members]
         db.set_setting('follow_list', follow)
-        if members:
-            db.ups().bulk_write([
-                UpdateOne({'uid': m['mid']}, {'$set': {
-                    'uname': m['uname'], 'avatar': m['face'], 'sign': m.get('sign', ''),
-                }}, upsert=True)
-                for m in members
-            ], ordered=False)
+        with db.transaction() as c:
+            c.executemany(
+                'INSERT INTO ups (uid, uname, avatar, sign) VALUES (?, ?, ?, ?) ON CONFLICT (uid) DO UPDATE '
+                'SET uname = excluded.uname, avatar = excluded.avatar, sign = excluded.sign',
+                [(m['mid'], m['uname'], m['face'], m.get('sign', '')) for m in members],
+            )
 
     try:
         special = [m['mid'] for m in bili.tag_members(SPECIAL_FOLLOW_TAG_ID)]
@@ -86,7 +82,9 @@ def _run(bili):
         logger.warning('已翻 %d 页仍未到达截止时间，更早的动态将被跳过', config.MAX_DYNAMIC_FETCH_PAGE)
 
     targets = [i for i in items if i['uid'] in follow]
-    existing = {d['vid'] for d in db.videos().find({'vid': {'$in': [i['vid'] for i in targets]}}, {'vid': 1})}
+    target_vids = [i['vid'] for i in targets]
+    existing = {r['vid'] for r in db.query(f'SELECT vid FROM videos WHERE vid IN ({db.marks(target_vids)})',
+                                           target_vids)}
 
     docs = []
     for item in targets:
@@ -99,12 +97,7 @@ def _run(bili):
             meta = None
         docs.append(videos.from_feed(item, meta, item['uid'] in special))
 
-    inserted = 0
-    if docs:
-        try:
-            inserted = len(db.videos().insert_many(docs, ordered=False).inserted_ids)
-        except BulkWriteError as err:
-            inserted = err.details.get('nInserted', 0)
+    inserted = db.insert_videos(docs) if docs else 0
 
     if items:
         new_checkpoint = max(i['pdate'] for i in items)

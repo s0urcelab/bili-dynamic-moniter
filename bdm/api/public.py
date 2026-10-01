@@ -2,8 +2,8 @@ from flask import Blueprint, request
 
 from bdm import db
 from bdm.api.auth import is_admin
-from bdm.api.common import (PUBLISHED, ApiError, attach, int_arg, keyword_regex, ok, page_args,
-                            paginate, play_url, song_ids_matching)
+from bdm.api.common import (PUBLISHED, SONG_MATCHES, ApiError, attach, int_arg, ok, page_args, paginate,
+                            play_url, search_ups, ups_by_uid)
 
 bp = Blueprint('public', __name__, url_prefix='/api')
 
@@ -11,24 +11,21 @@ bp = Blueprint('public', __name__, url_prefix='/api')
 @bp.get('/videos')
 def list_videos():
     page, size = page_args(15, 50)
-    query = dict(PUBLISHED)
+    where, params = PUBLISHED, ()
     uid = int_arg('uid')
     if uid:
-        query['uid'] = uid
-    return ok(paginate(query, page, size))
+        where, params = f'{PUBLISHED} AND uid = ?', (uid,)
+    return ok(paginate(where, params, page, size))
 
 
 @bp.get('/videos/<vid>')
 def video_detail(vid):
-    query = {'vid': vid} if is_admin() else {**PUBLISHED, 'vid': vid}
-    item = db.videos().find_one(query, {'_id': 0})
+    item = db.find_video('vid = ?' if is_admin() else f'{PUBLISHED} AND vid = ?', (vid,))
     if not item:
         raise ApiError('稿件不存在', 404)
 
     url, error = play_url(item)
-    related = db.videos().find(
-        {**PUBLISHED, 'uid': item['uid'], 'vid': {'$ne': vid}}, {'_id': 0},
-    ).sort('pdate', -1).limit(6)
+    related = db.find_videos(f'{PUBLISHED} AND uid = ? AND vid != ?', (item['uid'], vid), limit=6)
     return ok({
         'video': attach([item])[0],
         'play_url': url,
@@ -42,34 +39,24 @@ def search():
     keyword = (request.args.get('keyword') or '').strip()
     if not keyword:
         raise ApiError('缺少关键词 keyword')
-    regex = keyword_regex(keyword)
-    ups = list(db.ups().find({'uname': regex}, {'_id': 0}).limit(20))
-    query = {**PUBLISHED, '$or': [
-        {'shazam_id': {'$in': song_ids_matching(regex)}},
-        {'title': regex},
-        {'etitle': regex},
-    ]}
-    videos = db.videos().find(query, {'_id': 0}).sort('pdate', -1).limit(50)
-    return ok({'ups': ups, 'videos': attach(videos)})
+    videos = db.find_videos(
+        f'{PUBLISHED} AND ({SONG_MATCHES} OR icontains(title, ?) OR icontains(etitle, ?))',
+        (keyword,) * 3, limit=50,
+    )
+    return ok({'ups': search_ups(keyword), 'videos': attach(videos)})
 
 
 UP_SORTS = {
-    'recent': {'latest_at': -1, '_id': 1},
-    'count': {'video_count': -1, '_id': 1},
+    'recent': 'latest_at DESC, uid',
+    'count': 'video_count DESC, uid',
 }
 
-# 按 uid 汇总已发布稿件，uname/avatar 取最新一个稿件上的，作为关注列表里没有时的回退
-_UP_STATS = [
-    {'$match': PUBLISHED},
-    {'$sort': {'pdate': -1}},
-    {'$group': {
-        '_id': '$uid',
-        'video_count': {'$sum': 1},
-        'latest_at': {'$first': '$pdate'},
-        'uname': {'$first': '$uname'},
-        'avatar': {'$first': '$avatar'},
-    }},
-]
+# 按 uid 汇总已发布稿件。uname/avatar 取 pdate 最大的那条（SQLite 对 MAX() 旁的裸列保证这一点），
+# 作为关注列表里没有时的回退
+_UP_STATS = f"""
+    SELECT uid, COUNT(*) AS video_count, MAX(pdate) AS latest_at, uname, avatar
+    FROM videos WHERE {PUBLISHED} {{extra}} GROUP BY uid
+"""
 
 
 def _up_item(uid, stats, up):
@@ -91,32 +78,23 @@ def list_ups():
     sort = request.args.get('sort') or 'recent'
     if sort not in UP_SORTS:
         raise ApiError('参数 sort 只能是 recent 或 count')
-    result = next(db.videos().aggregate([
-        *_UP_STATS,
-        {'$match': {'_id': {'$ne': None}}},
-        {'$facet': {
-            'total': [{'$count': 'n'}],
-            'items': [{'$sort': UP_SORTS[sort]}, {'$skip': (page - 1) * size}, {'$limit': size}],
-        }},
-    ]), {})
-    rows = result.get('items', [])
-    total = result['total'][0]['n'] if result.get('total') else 0
-    uids = [r['_id'] for r in rows]
-    ups = {u['uid']: u for u in db.ups().find({'uid': {'$in': uids}}, {'_id': 0})} if uids else {}
-    items = [_up_item(r['_id'], r, ups.get(r['_id'])) for r in rows]
+    total = db.scalar(f'SELECT COUNT(DISTINCT uid) FROM videos WHERE {PUBLISHED}')
+    rows = db.query(f'{_UP_STATS.format(extra="")} ORDER BY {UP_SORTS[sort]} LIMIT ? OFFSET ?',
+                    (size, (page - 1) * size))
+    ups = ups_by_uid(r['uid'] for r in rows)
+    items = [_up_item(r['uid'], r, ups.get(r['uid'])) for r in rows]
     return ok({'items': items, 'total': total, 'page': page, 'size': size})
 
 
 @bp.get('/ups/<int:uid>')
 def up_info(uid):
-    stats = next(db.videos().aggregate([{'$match': {'uid': uid}}, *_UP_STATS]), None)
-    up = db.ups().find_one({'uid': uid}, {'_id': 0})
+    stats = db.query_one(_UP_STATS.format(extra='AND uid = ?'), (uid,))
+    up = db.query_one('SELECT * FROM ups WHERE uid = ?', (uid,))
     if not up and not stats:
         # 不在关注列表、也没有已发布稿件时，用任意一条稿件记录兜底（前台只认已发布的）
         if not is_admin():
             raise ApiError('UP 主不存在', 404)
-        video = db.videos().find_one({'uid': uid}, {'uname': 1, 'avatar': 1}, sort=[('pdate', -1)])
-        if not video:
+        up = db.query_one('SELECT uname, avatar FROM videos WHERE uid = ? ORDER BY pdate DESC LIMIT 1', (uid,))
+        if not up:
             raise ApiError('UP 主不存在', 404)
-        up = video
     return ok(_up_item(uid, stats, up))
