@@ -56,7 +56,7 @@ CLOUD189_TARGET_FOLDER_ID = _str('CLOUD189_TARGET_FOLDER_ID')
 
 # 流水线
 DOWNLOAD_BATCH = _int('DOWNLOAD_BATCH', _int('CONCURRENT_TASK_NUM', 3))
-UPLOAD_BATCH = _int('UPLOAD_BATCH', 5)
+UPLOAD_BATCH = _int('UPLOAD_BATCH', 3)
 MATCH_BATCH = _int('MATCH_BATCH', _int('CONCURRENT_TASK_NUM', 3))
 DOWNLOAD_MIN_DURATION = _int('DOWNLOAD_MIN_DURATION', 20)
 DOWNLOAD_MAX_DURATION = _int('DOWNLOAD_MAX_DURATION', 600)
@@ -66,8 +66,8 @@ UPLOAD_PAUSE_THRESHOLD = _int('UPLOAD_PAUSE_THRESHOLD', 3)
 
 # 调度（单位：分钟）
 SCHEDULE = {
-    'fetch': {'interval': _int('FETCH_INTERVAL', 15), 'timeout': _int('FETCH_TIMEOUT', 10)},
-    'download': {'interval': _int('DOWNLOAD_INTERVAL', 2), 'timeout': _int('DOWNLOAD_TIMEOUT', 60)},
-    'upload': {'interval': _int('UPLOAD_INTERVAL', 1), 'timeout': _int('UPLOAD_TIMEOUT', 120)},
+    'fetch': {'interval': _int('FETCH_INTERVAL', 3), 'timeout': _int('FETCH_TIMEOUT', 10)},
+    'download': {'interval': _int('DOWNLOAD_INTERVAL', 2), 'timeout': _int('DOWNLOAD_TIMEOUT', 20)},
+    'upload': {'interval': _int('UPLOAD_INTERVAL', 10), 'timeout': _int('UPLOAD_TIMEOUT', 60)},
     'match': {'interval': _int('MATCH_INTERVAL', 5), 'timeout': _int('MATCH_TIMEOUT', 30)},
 }

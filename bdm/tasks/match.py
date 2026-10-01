@@ -1,4 +1,4 @@
-"""用 Shazam 识别已下载稿件的 BGM。"""
+"""用 Shazam 识别本地稿件的 BGM。"""
 import asyncio
 import logging
 

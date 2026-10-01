@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 MAX_BATCH = 500
 
-# 前台可见：精选且已下载
+# 前台可见：精选且本地
 PUBLISHED = {'ustatus': {'$gt': UStatus.DEFAULT}, 'dstatus': {'$gte': DStatus.LOCAL}}
 
 

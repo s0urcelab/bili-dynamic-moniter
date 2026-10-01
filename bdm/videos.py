@@ -72,7 +72,7 @@ def download_url(item):
 
 
 def finalize(vid):
-    """上传和 BGM 识别都完成后，清理本地文件并标记为已归档。"""
+    """上传和 BGM 识别都完成后，清理本地文件并标记为云盘。"""
     item = db.videos().find_one({'vid': vid})
     if not item or item.get('dstatus') != DStatus.LOCAL:
         return
@@ -80,4 +80,4 @@ def finalize(vid):
         return
     media.remove_local_files(item)
     db.videos().update_one({'vid': vid, 'dstatus': DStatus.LOCAL}, {'$set': {'dstatus': DStatus.CLOUD}})
-    logger.info('已归档：%s %s', item['title'], vid)
+    logger.info('云盘：%s %s', item['title'], vid)

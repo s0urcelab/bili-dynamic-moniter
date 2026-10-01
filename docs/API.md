@@ -69,8 +69,8 @@
 | --- | --- | --- |
 | `0` | 待下载 | 下载阶段拾取 |
 | `100` | 下载中 | |
-| `200` | 已下载（本地文件就绪） | 上传和识别阶段拾取，两者都完成后变为 `201` |
-| `201` | 已归档（在云盘，本地文件已清理） | |
+| `200` | 本地（文件就绪） | 上传和识别阶段拾取，两者都完成后变为 `201` |
+| `201` | 云盘（本地文件已清理） | |
 | `-1` | 下载失败 | 自动重试，直到 `dl_retry` 达到上限 |
 | `-2` | 文件缺失 | 同上 |
 | `-3` | 分辨率不达标，本地保留目前最好的版本 | 同上；重试用尽后使用最好的版本并标记 `low_res` |
@@ -79,7 +79,7 @@
 | `-9` | 获取详情失败 | 不自动重试 |
 | `-11` | 充电专属 | 不自动重试 |
 
-前台只展示"精选且已下载"（`ustatus > 0` 且 `dstatus >= 200`）的稿件，下文称为**已发布**。
+前台只展示"精选且本地/云盘"（`ustatus > 0` 且 `dstatus >= 200`）的稿件，下文称为**已发布**。
 
 ---
 
@@ -186,7 +186,7 @@ UP 主信息：`{ uid, uname, avatar, sign, video_count, latest_at }`，字段�
 | --- | --- |
 | `page` | 默认 1 |
 | `size` | 默认 50，最大 200 |
-| `filter` | `all`（默认）、`pending` 待下载/下载中、`local` 已下载、`archived` 已归档、`download_failed` 下载失败、`upload_failed` 上传失败、`selected` 精选、`low_res` 分辨率不达标（包括重试中的和已被保留的） |
+| `filter` | `all`（默认）、`pending` 待下载/下载中、`local` 本地、`archived` 云盘、`download_failed` 下载失败、`upload_failed` 上传失败、`selected` 精选、`low_res` 分辨率不达标（包括重试中的和已被保留的） |
 | `uid` | 可选，只看某个 UP 主 |
 | `keyword` | 可选，匹配 vid（精确）、标题、BGM 标题、UP 主昵称 |
 
@@ -216,7 +216,7 @@ UP 主信息：`{ uid, uname, avatar, sign, video_count, latest_at }`，字段�
 
 ### `POST /api/admin/videos/retry-upload`
 
-对已下载、尚未上传的稿件清零上传重试次数，让上传阶段重新拾取。返回 `{ "modified": n }`。
+对本地、尚未上传的稿件清零上传重试次数，让上传阶段重新拾取。返回 `{ "modified": n }`。
 
 ### `POST /api/admin/videos/reset-bgm`
 

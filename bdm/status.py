@@ -51,8 +51,8 @@ class Source:
 DSTATUS_LABELS = {
     DStatus.PENDING: '待下载',
     DStatus.DOWNLOADING: '下载中',
-    DStatus.LOCAL: '已下载',
-    DStatus.CLOUD: '已归档',
+    DStatus.LOCAL: '本地',
+    DStatus.CLOUD: '云盘',
     DStatus.FAILED: '下载失败',
     DStatus.FILE_MISSING: '文件缺失',
     DStatus.LOW_RES: '分辨率不达标',
