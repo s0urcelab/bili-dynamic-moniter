@@ -11,7 +11,8 @@ name: Create and publish a Docker image
 
 on:
   push:
-    branches: ['master']
+    branches: ['master', 'refactor/bdm-package']
+  workflow_dispatch:
 
 env:
   # REGISTRY: ghcr.io
@@ -26,12 +27,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
-          token: ${{ secrets.PAT_TOKEN }}
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: actions/checkout@v4
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -53,10 +49,14 @@ jobs:
         uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
         with:
           images: ${{ env.IMAGE_NAME }}
+          # latest / 纯数字 tag 只给 master，其他分支用分支名前缀，避免覆盖线上镜像
           tags: |
-            type=raw,value=latest
-            type=raw,value=${{ github.run_number }}
-            type=raw,value=${{ github.run_id }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
+            type=raw,value=${{ github.run_number }},enable=${{ github.ref == 'refs/heads/master' }}
+            type=raw,value=${{ github.run_id }},enable=${{ github.ref == 'refs/heads/master' }}
+            type=ref,event=branch
+            type=ref,event=branch,suffix=-${{ github.run_number }},enable=${{ github.ref != 'refs/heads/master' }}
+            type=sha
 
       - name: Build and push Docker image
         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
@@ -65,3 +65,5 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
