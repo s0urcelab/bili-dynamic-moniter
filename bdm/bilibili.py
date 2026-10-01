@@ -113,6 +113,10 @@ class BiliClient:
         data = self._get(FEED_API, params, auth=True) or {}
         return data.get('items') or [], data.get('offset', ''), bool(data.get('has_more'))
 
+    def festival_url(self, bvid):
+        """活动稿件的视频页只返回前端跳转的空壳，yt-dlp 需要直接使用活动页地址。"""
+        return (self._get(VIEW_API, {'bvid': bvid}) or {}).get('festival_jump_url') or None
+
     def video_meta(self, bvid, p=1):
         view = self._get(VIEW_API, {'bvid': bvid})
         pages = view.get('pages') or []

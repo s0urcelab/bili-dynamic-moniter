@@ -68,6 +68,14 @@ def download_url(item):
     p = item.get('p') or 1
     if item.get('source') == Source.IMPORT_ACFUN:
         return acfun.video_url(vid, p)
+    if p == 1:
+        try:
+            festival = bilibili.BiliClient().festival_url(vid)
+        except Exception as err:
+            logger.warning('查询活动页地址失败 %s：%s', vid, err)
+        else:
+            if festival:
+                return festival
     return bilibili.video_url(vid, p)
 
 
