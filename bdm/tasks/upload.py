@@ -8,17 +8,20 @@ import logging
 from datetime import datetime, timezone
 
 from bdm import cloud, config, db, media, videos
-from bdm.status import DStatus
+from bdm.status import DStatus, UStatus
 from bdm.tasks import state
 
 logger = logging.getLogger(__name__)
 
 STAGE = 'upload'
 
+# 接入云盘之前下载的非精选稿件没有 downloaded_at，只留在本地，不补传
+QUEUE = (f'dstatus = {DStatus.LOCAL} AND fid IS NULL '
+         f'AND (ustatus >= {UStatus.SELECTED} OR downloaded_at IS NOT NULL)')
+
 
 def candidates(limit):
-    return db.find_videos(f'dstatus = {DStatus.LOCAL} AND fid IS NULL AND cloud_retry < ?',
-                          (config.MAX_UPLOAD_RETRY,), limit=limit)
+    return db.find_videos(f'{QUEUE} AND cloud_retry < ?', (config.MAX_UPLOAD_RETRY,), limit=limit)
 
 
 def upload_one(item):

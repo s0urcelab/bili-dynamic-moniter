@@ -9,7 +9,7 @@ from bdm import cloud, config, cookies, db, media
 from bdm.api.common import ApiError, body, ok
 from bdm.bilibili import format_ts
 from bdm.status import DSTATUS_LABELS, DStatus, ShazamStatus, UStatus
-from bdm.tasks import state
+from bdm.tasks import state, upload
 
 logger = logging.getLogger(__name__)
 
@@ -177,6 +177,6 @@ def stats():
             for k, v in by_status.items()
         ],
         'selected': db.count_videos(f'ustatus > {UStatus.DEFAULT}'),
-        'waiting_upload': db.count_videos(f'dstatus = {DStatus.LOCAL} AND fid IS NULL'),
+        'waiting_upload': db.count_videos(upload.QUEUE),
         'waiting_match': db.count_videos(f'dstatus = {DStatus.LOCAL} AND bgm_status = {ShazamStatus.PENDING}'),
     })
