@@ -12,6 +12,7 @@ import os
 import re
 import shutil
 import subprocess
+from urllib.parse import quote
 
 from bdm import config
 from bdm.status import Source
@@ -122,7 +123,7 @@ def local_url(path):
     if not config.LOCAL_FILE_URL_PREFIX:
         return None
     rel = os.path.relpath(path, config.MEDIA_ROOT).replace(os.sep, '/')
-    return config.LOCAL_FILE_URL_PREFIX.rstrip('/') + '/' + rel
+    return config.LOCAL_FILE_URL_PREFIX.rstrip('/') + '/' + quote(rel)
 
 
 def probe_video(path):
