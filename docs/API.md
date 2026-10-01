@@ -142,9 +142,35 @@
 
 `ups` 最多 20 个，`videos` 最多 50 个。
 
+### `GET /api/ups`
+
+有已发布稿件的 UP 主列表。没有已发布稿件的 UP 主不返回。
+
+| 参数 | 说明 |
+| --- | --- |
+| `page` | 默认 1 |
+| `size` | 默认 20，最大 100 |
+| `sort` | `recent`（默认）按最新已发布稿件的发布时间倒序；`count` 按已发布稿件数倒序。两种排序相同时按 `uid` 升序，保证翻页稳定 |
+
+返回分页结构，`items` 中每一项为：
+
+```json
+{ "uid": 123456, "uname": "...", "avatar": "https://...", "sign": "...", "video_count": 42, "latest_at": 1727780000 }
+```
+
+- `video_count`：已发布稿件数。
+- `latest_at`：最新已发布稿件的 `pdate`（秒级时间戳）。
+
+前台首页只取第一页展示"最近更新的 UP 主"，完整列表在 `/ups` 页面无限滚动加载。
+
 ### `GET /api/ups/<uid>`
 
-UP 主信息：`{ uid, uname, avatar, sign, video_count }`，其中 `video_count` 为已发布稿件数。不存在时返回 404。
+UP 主信息：`{ uid, uname, avatar, sign, video_count, latest_at }`，字段含义同上。
+
+- 已关注但还没有已发布稿件的 UP 主也会返回，此时 `video_count` 为 `0`，`latest_at` 为 `null`。
+- 昵称和头像优先取关注列表；不在关注列表中（如手动导入、已取关）时，取其最新一个已发布稿件上的信息。
+- 登录后，只有未发布稿件的 UP 主也会返回（取其最新一个稿件上的信息），便于后台展示。
+- 以上都不满足时返回 404。
 
 ---
 
