@@ -404,6 +404,14 @@ UP 主信息：`{ uid, uname, avatar, sign, video_count, latest_at }`，字段�
 
 云盘容量获取失败时，`used_bytes` 和 `total_bytes` 为 `null`，`error` 为失败原因。
 
+### `GET /api/admin/versions`
+
+```json
+{ "yt_dlp": "2025.10.22", "shazamio": "0.3.1.1" }
+```
+
+依赖的版本号。api 与 worker 使用同一镜像，所以这里的版本也就是 worker 下载时实际使用的版本。未安装时为 `null`。
+
 ### `GET /api/admin/stats`
 
 ```json

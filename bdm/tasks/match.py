@@ -19,7 +19,7 @@ def candidates(limit):
 
 async def recognize(shazam, path):
     """返回 (shazam_id, 曲名)；没有匹配时返回 (NO_MATCH, None)。"""
-    raw = await shazam.recognize_song(path)
+    raw = await shazam.recognize(path)
     result = Serialize.full_track(raw)
     if not result.matches:
         return ShazamStatus.NO_MATCH, None

@@ -7,5 +7,5 @@ apscheduler>=3.11,<4
 python-dotenv==1.0.0
 tzdata
 yt-dlp>=2025.5.22
-shazamio==0.3.1.1
+shazamio>=0.8.1
 cloud189>=0.1.6

@@ -1,6 +1,7 @@
 import logging
 import time
 from datetime import datetime, timezone
+from importlib import metadata
 
 from flask import Blueprint
 from flask_jwt_extended import verify_jwt_in_request
@@ -162,6 +163,18 @@ def storage():
         cloud.reset()
         cloud_info['error'] = '获取云盘容量失败'
     return ok({'local_bytes': local_bytes, 'cloud': cloud_info})
+
+
+def _package_version(name):
+    try:
+        return metadata.version(name)
+    except metadata.PackageNotFoundError:
+        return None
+
+
+@bp.get('/versions')
+def versions():
+    return ok({'yt_dlp': _package_version('yt-dlp'), 'shazamio': _package_version('shazamio')})
 
 
 @bp.get('/stats')

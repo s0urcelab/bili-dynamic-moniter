@@ -5,7 +5,7 @@ ENV TZ=Asia/Shanghai \
     PYTHONDONTWRITEBYTECODE=1 \
     MALLOC_ARENA_MAX=2
 
-# ffmpeg：yt-dlp 合并音视频、ffprobe 校验分辨率、pydub 解码音频
+# ffmpeg：yt-dlp 合并音视频、ffprobe 校验分辨率、shazamio 解码 mp4 音频
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg \
     && rm -rf /var/lib/apt/lists/*
