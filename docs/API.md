@@ -228,9 +228,9 @@ UP 主信息：`{ uid, uname, avatar, sign, video_count, latest_at }`，字段�
 
 ### `POST /api/admin/videos/delete-range`
 
-批量删除发布时间在区间内、**未精选**的稿件及文件。
+批量删除发布时间在区间内、且符合 `filter` 的稿件及文件。`filter` 与列表接口相同，缺省为 `all`。除 `selected` 外都会跳过精选稿件。
 
-请求体：`{ "start": 1700000000, "end": 1700086400, "uid": 123 }`，`start` 和 `end` 是秒级时间戳（闭区间），`uid` 可选。
+请求体：`{ "start": 1700000000, "end": 1700086400, "filter": "archived", "uid": 123 }`，`start` 和 `end` 是秒级时间戳（闭区间），`filter` 和 `uid` 可选。
 
 返回 `{ "deleted": n }`。
 

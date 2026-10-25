@@ -141,7 +141,10 @@ def delete():
 
 @bp.post('/delete-range')
 def delete_range():
-    """删除发布时间在 [start, end] 内、未精选的稿件及其文件。"""
+    """删除发布时间在 [start, end] 内、且符合当前列表筛选的稿件及其文件。
+
+    精选页清理的就是精选稿件；其他分类仍跳过精选，避免误删。
+    """
     data = body()
     try:
         start, end = int(data['start']), int(data['end'])
@@ -149,11 +152,21 @@ def delete_range():
         raise ApiError('start、end 必须是秒级时间戳')
     if start > end:
         raise ApiError('start 不能大于 end')
-    where, params = f'ustatus = {UStatus.DEFAULT} AND pdate BETWEEN ? AND ?', [start, end]
+
+    status = data.get('filter') or 'all'
+    if status not in FILTERS:
+        raise ApiError(f'filter 可选值：{", ".join(FILTERS)}')
+
+    clauses = ['pdate BETWEEN ? AND ?']
+    params = [start, end]
+    if status != 'selected':
+        clauses.append(f'ustatus = {UStatus.DEFAULT}')
+    if FILTERS[status]:
+        clauses.append(FILTERS[status])
     if data.get('uid'):
-        where += ' AND uid = ?'
+        clauses.append('uid = ?')
         params.append(int(data['uid']))
-    count = _delete(db.find_videos(where, params))
+    count = _delete(db.find_videos(' AND '.join(clauses), params))
     return ok({'deleted': count}, f'共删除 {count} 个稿件')
 
 
